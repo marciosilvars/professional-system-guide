@@ -113,6 +113,7 @@ export type Database = {
           created_by: string | null
           data: string
           id: string
+          indisponiveis: string[]
           observacoes: string
           status: string
           updated_at: string
@@ -125,6 +126,7 @@ export type Database = {
           created_by?: string | null
           data: string
           id?: string
+          indisponiveis?: string[]
           observacoes?: string
           status?: string
           updated_at?: string
@@ -137,6 +139,7 @@ export type Database = {
           created_by?: string | null
           data?: string
           id?: string
+          indisponiveis?: string[]
           observacoes?: string
           status?: string
           updated_at?: string

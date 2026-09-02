@@ -1,0 +1,1 @@
+ALTER TABLE public.escalas ADD COLUMN indisponiveis UUID[] NOT NULL DEFAULT '{}';
