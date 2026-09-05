@@ -11,6 +11,7 @@ import {
   FileSpreadsheet,
   Search,
   Loader2,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +23,8 @@ import {
   formatarDataBR,
   gerarItensEscala,
   hojeISO,
+  linkWhatsApp,
+  mensagemCancelamentoRota,
   textoWhatsApp,
   type Escala,
   type EscalaItem,
