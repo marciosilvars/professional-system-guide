@@ -256,6 +256,30 @@ function EscalasPage() {
     });
   };
 
+  const cancelarRota = async (idx: number) => {
+    const item = itens[idx];
+    if (!item) return;
+    const proximos = itens.map((it, i) =>
+      i === idx ? { ...it, status: "cancelado" as StatusItem } : it,
+    );
+    setItens(proximos);
+
+    const texto = mensagemCancelamentoRota(item.motorista_nome, data);
+    window.open(linkWhatsApp(item.telefone, texto), "_blank", "noopener");
+
+    await registrarAuditoria({
+      acao: "cancelou rota",
+      entidade: "escala_item",
+      entidadeId: item.motorista_id,
+      detalhes: `${item.motorista_nome} · ${formatarDataBR(data)}`,
+    });
+
+    if (escala) {
+      await persistir(escala.status === "definitiva" ? "definitiva" : "previa", proximos);
+    }
+    toast.success("Rota cancelada e mensagem aberta no WhatsApp.");
+  };
+
   const copiarWhatsApp = async () => {
     const texto = textoWhatsApp(data, itens);
     try {
