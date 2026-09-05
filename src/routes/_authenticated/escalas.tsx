@@ -189,7 +189,11 @@ function EscalasPage() {
       if (erroItens) throw erroItens;
 
       if (status === "definitiva") {
-        const ids = itens.map((i) => i.motorista_id).filter(Boolean) as string[];
+        // Rotas canceladas pela Amazon não contam rodízio: o motorista volta na próxima escala.
+        const ids = itens
+          .filter((i) => i.status !== "cancelado")
+          .map((i) => i.motorista_id)
+          .filter(Boolean) as string[];
         if (ids.length > 0) {
           await supabase.from("motoristas").update({ ultima_escala: data }).in("id", ids);
         }
