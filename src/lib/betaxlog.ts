@@ -166,6 +166,27 @@ export function formatarTelefone(valor: string): string {
   return num.replace(/(\d{2})(\d{5})(\d{0,4})/, "($1) $2-$3");
 }
 
+/** Mensagem enviada ao motorista quando a rota é cancelada pela Amazon. */
+export function mensagemCancelamentoRota(nome: string, data: string): string {
+  const primeiroNome = nome.trim().split(/\s+/)[0] ?? "";
+  return [
+    `Olá, ${primeiroNome}! Aqui é da BETAXLOG.`,
+    "",
+    `Informamos que sua rota do dia ${formatarDataBR(data)} foi cancelada pela Amazon.`,
+    "Esse cancelamento não é por falta sua e não afeta sua posição no rodízio.",
+    "Em caso de falta de outro motorista ou rota extra, acionaremos você.",
+    "",
+    "Obrigado pela compreensão!",
+  ].join("\n");
+}
+
+/** Monta o link do WhatsApp para o telefone informado (DDI 55 quando ausente). */
+export function linkWhatsApp(telefone: string, texto: string): string {
+  const digitos = telefone.replace(/\D/g, "");
+  const numero = digitos ? (digitos.startsWith("55") ? digitos : `55${digitos}`) : "";
+  return `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
+}
+
 export interface LinhaCompartilhavel {
   dsp: string;
   motorista_nome: string;

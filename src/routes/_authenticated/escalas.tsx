@@ -11,6 +11,7 @@ import {
   FileSpreadsheet,
   Search,
   Loader2,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +23,8 @@ import {
   formatarDataBR,
   gerarItensEscala,
   hojeISO,
+  linkWhatsApp,
+  mensagemCancelamentoRota,
   textoWhatsApp,
   type Escala,
   type EscalaItem,
@@ -156,7 +159,8 @@ function EscalasPage() {
     toast.success(`Prévia gerada com ${novos.length} vagas.`);
   };
 
-  const persistir = async (status: "previa" | "definitiva") => {
+  const persistir = async (status: "previa" | "definitiva", lista: NovoItem[] = itens) => {
+    const itens = lista;
     if (itens.length === 0) {
       toast.warning("Gere a prévia da escala antes de salvar.");
       return;
@@ -188,7 +192,11 @@ function EscalasPage() {
       if (erroItens) throw erroItens;
 
       if (status === "definitiva") {
-        const ids = itens.map((i) => i.motorista_id).filter(Boolean) as string[];
+        // Rotas canceladas pela Amazon não contam rodízio: o motorista volta na próxima escala.
+        const ids = itens
+          .filter((i) => i.status !== "cancelado")
+          .map((i) => i.motorista_id)
+          .filter(Boolean) as string[];
         if (ids.length > 0) {
           await supabase.from("motoristas").update({ ultima_escala: data }).in("id", ids);
         }
@@ -249,6 +257,30 @@ function EscalasPage() {
       telefone: m.telefone,
       veiculo: m.tipo_veiculo,
     });
+  };
+
+  const cancelarRota = async (idx: number) => {
+    const item = itens[idx];
+    if (!item) return;
+    const proximos = itens.map((it, i) =>
+      i === idx ? { ...it, status: "cancelado" as StatusItem } : it,
+    );
+    setItens(proximos);
+
+    const texto = mensagemCancelamentoRota(item.motorista_nome, data);
+    window.open(linkWhatsApp(item.telefone, texto), "_blank", "noopener");
+
+    await registrarAuditoria({
+      acao: "cancelou rota",
+      entidade: "escala_item",
+      entidadeId: item.motorista_id,
+      detalhes: `${item.motorista_nome} · ${formatarDataBR(data)}`,
+    });
+
+    if (escala) {
+      await persistir(escala.status === "definitiva" ? "definitiva" : "previa", proximos);
+    }
+    toast.success("Rota cancelada e mensagem aberta no WhatsApp.");
   };
 
   const copiarWhatsApp = async () => {
@@ -398,6 +430,7 @@ function EscalasPage() {
                     <th className="py-2 pr-3">Veículo</th>
                     <th className="py-2 pr-3">Onda</th>
                     <th className="py-2 pr-3">Situação</th>
+                    <th className="py-2">Ação</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -463,6 +496,19 @@ function EscalasPage() {
                             ))}
                           </SelectContent>
                         </Select>
+                      </td>
+                      <td className="py-2 whitespace-nowrap">
+                        {item.status === "cancelado" ? (
+                          <Badge variant="destructive">Rota cancelada</Badge>
+                        ) : item.motorista_id ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void cancelarRota(idx)}
+                          >
+                            <XCircle className="mr-2 h-4 w-4" /> Cancelar rota
+                          </Button>
+                        ) : null}
                       </td>
                     </tr>
                   ))}
