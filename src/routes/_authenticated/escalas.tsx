@@ -508,25 +508,34 @@ function EscalasPage() {
             Nenhum motorista cadastrado. Comece pela aba Motoristas.
           </p>
         ) : (
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {listaFiltrada.map((m) => (
-              <label
-                key={m.id}
-                className="flex items-center gap-3 rounded-lg border border-border px-3 py-2 text-sm"
-              >
-                <Checkbox
-                  checked={indisponiveis.has(m.id)}
-                  onCheckedChange={() => alternarIndisponivel(m.id)}
-                />
-                <span className="truncate">
-                  {m.prioritario && "⭐ "}
-                  {m.nome}
-                </span>
-                <span className="ml-auto text-xs text-muted-foreground">{m.tipo_veiculo}</span>
-              </label>
-            ))}
+          <div className="rounded-xl border border-border bg-muted/20 p-3">
+            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+              <span>{listaFiltrada.length} motorista(s)</span>
+              <span>{indisponiveis.size} marcado(s) como indisponível</span>
+            </div>
+            <div className="max-h-80 overflow-y-auto pr-1">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {listaFiltrada.map((m) => (
+                  <label
+                    key={m.id}
+                    className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 text-sm"
+                  >
+                    <Checkbox
+                      checked={indisponiveis.has(m.id)}
+                      onCheckedChange={() => alternarIndisponivel(m.id)}
+                    />
+                    <span className="truncate">
+                      {m.prioritario && "⭐ "}
+                      {m.nome}
+                    </span>
+                    <span className="ml-auto text-xs text-muted-foreground">{m.tipo_veiculo}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
         )}
+
       </section>
     </div>
   );
