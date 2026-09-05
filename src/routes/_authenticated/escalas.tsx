@@ -493,6 +493,19 @@ function EscalasPage() {
                           </SelectContent>
                         </Select>
                       </td>
+                      <td className="py-2 whitespace-nowrap">
+                        {item.status === "cancelado" ? (
+                          <Badge variant="destructive">Rota cancelada</Badge>
+                        ) : item.motorista_id ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void cancelarRota(idx)}
+                          >
+                            <XCircle className="mr-2 h-4 w-4" /> Cancelar rota
+                          </Button>
+                        ) : null}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
