@@ -111,6 +111,12 @@ function MotoristasPage() {
 
   const salvarEdicao = async () => {
     if (!editando) return;
+    if (!editando.nome.trim()) return;
+    if (nomeExiste(editando.nome, editando.id)) {
+      toast.error("Motorista já cadastrado.");
+      return;
+    }
+
     const { error } = await supabase
       .from("motoristas")
       .update({
