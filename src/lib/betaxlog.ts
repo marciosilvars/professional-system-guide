@@ -166,10 +166,15 @@ export function formatarTelefone(valor: string): string {
   return num.replace(/(\d{2})(\d{5})(\d{0,4})/, "($1) $2-$3");
 }
 
-export function textoWhatsApp(
-  data: string,
-  itens: Pick<EscalaItem, "dsp" | "motorista_nome" | "veiculo" | "onda" | "status">[],
-): string {
+export interface LinhaCompartilhavel {
+  dsp: string;
+  motorista_nome: string;
+  veiculo: string;
+  onda: string;
+  status: string;
+}
+
+export function textoWhatsApp(data: string, itens: LinhaCompartilhavel[]): string {
   const linhas = itens
     .filter((i) => i.status !== "cancelado")
     .map(
