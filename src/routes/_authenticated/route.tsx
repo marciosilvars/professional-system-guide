@@ -27,6 +27,7 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 const LINKS = [
+  { to: "/painel", label: "Painel", icon: LayoutDashboard },
   { to: "/escalas", label: "Escalas", icon: CalendarRange },
   { to: "/motoristas", label: "Motoristas", icon: Users },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
