@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet, redirect, Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  LayoutDashboard,
   CalendarRange,
   Users,
   BarChart3,
@@ -27,6 +28,7 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 const LINKS = [
+  { to: "/painel", label: "Painel", icon: LayoutDashboard },
   { to: "/escalas", label: "Escalas", icon: CalendarRange },
   { to: "/motoristas", label: "Motoristas", icon: Users },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3 },

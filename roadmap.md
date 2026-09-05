@@ -12,3 +12,5 @@
 - [x] Histórico auditável (log de ações)
 - [x] Metadados SEO por rota
 - [x] Verificar build e teste visual das telas
+- [x] Painel do dia (visão geral: motoristas ativos, vagas, rotas concluídas/canceladas, prioritários)
+- [x] Correção de tipagem no compartilhamento por WhatsApp + fallback quando a cópia é bloqueada

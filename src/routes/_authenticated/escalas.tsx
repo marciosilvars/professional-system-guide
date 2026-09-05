@@ -252,8 +252,13 @@ function EscalasPage() {
   };
 
   const copiarWhatsApp = async () => {
-    await navigator.clipboard.writeText(textoWhatsApp(data, itens as never));
-    toast.success("Texto copiado para o WhatsApp.");
+    const texto = textoWhatsApp(data, itens);
+    try {
+      await navigator.clipboard.writeText(texto);
+      toast.success("Texto copiado para o WhatsApp.");
+    } catch {
+      window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank", "noopener");
+    }
   };
 
   const gerarImagem = async () => {
