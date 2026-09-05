@@ -287,21 +287,42 @@ function EscalasPage() {
     const texto = textoWhatsApp(data, itens);
     try {
       await navigator.clipboard.writeText(texto);
-      toast.success("Texto copiado para o WhatsApp.");
+      toast.success("Texto copiado. Abrindo o WhatsApp...");
     } catch {
-      window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank", "noopener");
+      toast.info("Abrindo o WhatsApp com o texto da escala...");
     }
+    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank", "noopener");
   };
 
   const gerarImagem = async () => {
-    if (!capturaRef.current) return;
+    const alvo = capturaRef.current;
+    const rolagem = rolagemRef.current;
+    if (!alvo) return;
     const html2canvas = (await import("html2canvas")).default;
-    const canvas = await html2canvas(capturaRef.current, { backgroundColor: "#ffffff", scale: 2 });
-    const link = document.createElement("a");
-    link.download = `escala-betaxlog-${data}.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
-    toast.success("Imagem gerada.");
+    // Remove o limite de altura para que a imagem contenha todos os motoristas.
+    const maxAnterior = rolagem?.style.maxHeight ?? "";
+    const overflowAnterior = rolagem?.style.overflowY ?? "";
+    if (rolagem) {
+      rolagem.style.maxHeight = "none";
+      rolagem.style.overflowY = "visible";
+    }
+    try {
+      const canvas = await html2canvas(alvo, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        windowHeight: alvo.scrollHeight + 200,
+      });
+      const link = document.createElement("a");
+      link.download = `escala-betaxlog-${data}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+      toast.success("Imagem gerada com todos os motoristas.");
+    } finally {
+      if (rolagem) {
+        rolagem.style.maxHeight = maxAnterior;
+        rolagem.style.overflowY = overflowAnterior;
+      }
+    }
   };
 
   const exportarExcel = async () => {
