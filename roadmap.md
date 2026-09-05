@@ -11,4 +11,4 @@
 - [x] Relatórios: KPIs, gráficos, ranking, export Excel/PDF
 - [x] Histórico auditável (log de ações)
 - [x] Metadados SEO por rota
-- [ ] Verificar build e teste visual das telas
+- [x] Verificar build e teste visual das telas
