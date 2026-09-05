@@ -421,99 +421,105 @@ function EscalasPage() {
               <p className="text-sm text-muted-foreground">Data: {formatarDataBR(data)}</p>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <th className="py-2 pr-3">DSP</th>
-                    <th className="py-2 pr-3">Motorista</th>
-                    <th className="py-2 pr-3">Veículo</th>
-                    <th className="py-2 pr-3">Onda</th>
-                    <th className="py-2 pr-3">Situação</th>
-                    <th className="py-2">Ação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {itens.map((item, idx) => (
-                    <tr
-                      key={idx}
-                      className={
-                        item.status === "cancelado"
-                          ? "border-b border-border/60 text-muted-foreground line-through"
-                          : "border-b border-border/60"
-                      }
-                    >
-                      <td className="py-2 pr-3">
-                        <Input
-                          className="h-8 w-28"
-                          value={item.dsp}
-                          placeholder={DSP_PADRAO}
-                          onChange={(e) => atualizarItem(idx, { dsp: e.target.value })}
-                        />
-                      </td>
-                      <td className="py-2 pr-3 min-w-52">
-                        <Select
-                          value={item.motorista_id ?? "vago"}
-                          onValueChange={(v) => trocarMotorista(idx, v)}
-                        >
-                          <SelectTrigger className="h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="vago">{VAGA_LIVRE}</SelectItem>
-                            {motoristas.map((m) => (
-                              <SelectItem key={m.id} value={m.id}>
-                                {m.prioritario ? "⭐ " : ""}
-                                {m.nome}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="py-2 pr-3 whitespace-nowrap">{item.veiculo}</td>
-                      <td className="py-2 pr-3">
-                        <Input
-                          className="h-8 w-24"
-                          placeholder="07:00"
-                          maxLength={5}
-                          value={item.onda}
-                          onChange={(e) => atualizarItem(idx, { onda: e.target.value })}
-                        />
-                      </td>
-                      <td className="py-2 pr-3">
-                        <Select
-                          value={item.status}
-                          onValueChange={(v) => atualizarItem(idx, { status: v as StatusItem })}
-                        >
-                          <SelectTrigger className="h-8 w-36">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {(Object.keys(STATUS_ITEM_LABEL) as StatusItem[]).map((s) => (
-                              <SelectItem key={s} value={s}>
-                                {STATUS_ITEM_LABEL[s]}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="py-2 whitespace-nowrap">
-                        {item.status === "cancelado" ? (
-                          <Badge variant="destructive">Rota cancelada</Badge>
-                        ) : item.motorista_id ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => void cancelarRota(idx)}
-                          >
-                            <XCircle className="mr-2 h-4 w-4" /> Cancelar rota
-                          </Button>
-                        ) : null}
-                      </td>
+            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+              <span>{itens.length} vaga(s) gerada(s)</span>
+              <span>{itens.filter((i) => i.status === "cancelado").length} rota(s) cancelada(s)</span>
+            </div>
+            <div className="max-h-80 overflow-y-auto pr-1">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                      <th className="py-2 pr-3">DSP</th>
+                      <th className="py-2 pr-3">Motorista</th>
+                      <th className="py-2 pr-3">Veículo</th>
+                      <th className="py-2 pr-3">Onda</th>
+                      <th className="py-2 pr-3">Situação</th>
+                      <th className="py-2">Ação</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {itens.map((item, idx) => (
+                      <tr
+                        key={idx}
+                        className={
+                          item.status === "cancelado"
+                            ? "border-b border-border/60 text-muted-foreground line-through"
+                            : "border-b border-border/60"
+                        }
+                      >
+                        <td className="py-2 pr-3">
+                          <Input
+                            className="h-8 w-28"
+                            value={item.dsp}
+                            placeholder={DSP_PADRAO}
+                            onChange={(e) => atualizarItem(idx, { dsp: e.target.value })}
+                          />
+                        </td>
+                        <td className="py-2 pr-3 min-w-52">
+                          <Select
+                            value={item.motorista_id ?? "vago"}
+                            onValueChange={(v) => trocarMotorista(idx, v)}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="vago">{VAGA_LIVRE}</SelectItem>
+                              {motoristas.map((m) => (
+                                <SelectItem key={m.id} value={m.id}>
+                                  {m.prioritario ? "⭐ " : ""}
+                                  {m.nome}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="py-2 pr-3 whitespace-nowrap">{item.veiculo}</td>
+                        <td className="py-2 pr-3">
+                          <Input
+                            className="h-8 w-24"
+                            placeholder="07:00"
+                            maxLength={5}
+                            value={item.onda}
+                            onChange={(e) => atualizarItem(idx, { onda: e.target.value })}
+                          />
+                        </td>
+                        <td className="py-2 pr-3">
+                          <Select
+                            value={item.status}
+                            onValueChange={(v) => atualizarItem(idx, { status: v as StatusItem })}
+                          >
+                            <SelectTrigger className="h-8 w-36">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(Object.keys(STATUS_ITEM_LABEL) as StatusItem[]).map((s) => (
+                                <SelectItem key={s} value={s}>
+                                  {STATUS_ITEM_LABEL[s]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="py-2 whitespace-nowrap">
+                          {item.status === "cancelado" ? (
+                            <Badge variant="destructive">Rota cancelada</Badge>
+                          ) : item.motorista_id ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void cancelarRota(idx)}
+                            >
+                              <XCircle className="mr-2 h-4 w-4" /> Cancelar rota
+                            </Button>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
