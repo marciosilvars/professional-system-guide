@@ -191,12 +191,30 @@ function MotoristasPage() {
       }))
       .filter((r) => r.nome.length > 0);
 
+    const vistos = new Set(motoristas.map((m) => chave(m.nome)));
+    const novos: typeof registros = [];
+    const duplicados: string[] = [];
+    for (const r of registros) {
+      const k = chave(r.nome);
+      if (vistos.has(k)) {
+        duplicados.push(r.nome);
+        continue;
+      }
+      vistos.add(k);
+      novos.push(r);
+    }
+
+    e.target.value = "";
+
     if (registros.length === 0) {
       toast.warning("Nenhuma linha válida encontrada na planilha.");
       return;
     }
-    const { error } = await supabase.from("motoristas").insert(registros);
-    e.target.value = "";
+    if (novos.length === 0) {
+      toast.error("Nenhum motorista importado: todos já estão cadastrados.");
+      return;
+    }
+    const { error } = await supabase.from("motoristas").insert(novos);
     if (error) {
       toast.error("Falha ao importar a planilha.");
       return;
@@ -204,10 +222,15 @@ function MotoristasPage() {
     await registrarAuditoria({
       acao: "importou motoristas",
       entidade: "motorista",
-      detalhes: `${registros.length} registros`,
+      detalhes: `${novos.length} registros (${duplicados.length} já cadastrados)`,
     });
     await recarregar();
-    toast.success(`${registros.length} motoristas importados.`);
+    toast.success(
+      duplicados.length > 0
+        ? `${novos.length} motoristas importados. ${duplicados.length} ignorados por já estarem cadastrados.`
+        : `${novos.length} motoristas importados.`,
+    );
+
   };
 
   const lista = motoristas.filter((m) =>
