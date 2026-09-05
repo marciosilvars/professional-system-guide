@@ -76,9 +76,18 @@ function MotoristasPage() {
 
   const recarregar = () => queryClient.invalidateQueries({ queryKey: ["motoristas"] });
 
+  const chave = (n: string) => n.trim().toLowerCase().replace(/\s+/g, " ");
+  const nomeExiste = (n: string, ignorarId?: string) =>
+    motoristas.some((m) => chave(m.nome) === chave(n) && m.id !== ignorarId);
+
   const cadastrar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nome.trim()) return;
+    if (nomeExiste(form.nome)) {
+      toast.error("Motorista já cadastrado.");
+      return;
+    }
+
     const { data: userData } = await supabase.auth.getUser();
     const { data, error } = await supabase
       .from("motoristas")
