@@ -76,9 +76,18 @@ function MotoristasPage() {
 
   const recarregar = () => queryClient.invalidateQueries({ queryKey: ["motoristas"] });
 
+  const chave = (n: string) => n.trim().toLowerCase().replace(/\s+/g, " ");
+  const nomeExiste = (n: string, ignorarId?: string) =>
+    motoristas.some((m) => chave(m.nome) === chave(n) && m.id !== ignorarId);
+
   const cadastrar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nome.trim()) return;
+    if (nomeExiste(form.nome)) {
+      toast.error("Motorista já cadastrado.");
+      return;
+    }
+
     const { data: userData } = await supabase.auth.getUser();
     const { data, error } = await supabase
       .from("motoristas")
@@ -102,6 +111,12 @@ function MotoristasPage() {
 
   const salvarEdicao = async () => {
     if (!editando) return;
+    if (!editando.nome.trim()) return;
+    if (nomeExiste(editando.nome, editando.id)) {
+      toast.error("Motorista já cadastrado.");
+      return;
+    }
+
     const { error } = await supabase
       .from("motoristas")
       .update({
@@ -176,12 +191,30 @@ function MotoristasPage() {
       }))
       .filter((r) => r.nome.length > 0);
 
+    const vistos = new Set(motoristas.map((m) => chave(m.nome)));
+    const novos: typeof registros = [];
+    const duplicados: string[] = [];
+    for (const r of registros) {
+      const k = chave(r.nome);
+      if (vistos.has(k)) {
+        duplicados.push(r.nome);
+        continue;
+      }
+      vistos.add(k);
+      novos.push(r);
+    }
+
+    e.target.value = "";
+
     if (registros.length === 0) {
       toast.warning("Nenhuma linha válida encontrada na planilha.");
       return;
     }
-    const { error } = await supabase.from("motoristas").insert(registros);
-    e.target.value = "";
+    if (novos.length === 0) {
+      toast.error("Nenhum motorista importado: todos já estão cadastrados.");
+      return;
+    }
+    const { error } = await supabase.from("motoristas").insert(novos);
     if (error) {
       toast.error("Falha ao importar a planilha.");
       return;
@@ -189,10 +222,15 @@ function MotoristasPage() {
     await registrarAuditoria({
       acao: "importou motoristas",
       entidade: "motorista",
-      detalhes: `${registros.length} registros`,
+      detalhes: `${novos.length} registros (${duplicados.length} já cadastrados)`,
     });
     await recarregar();
-    toast.success(`${registros.length} motoristas importados.`);
+    toast.success(
+      duplicados.length > 0
+        ? `${novos.length} motoristas importados. ${duplicados.length} ignorados por já estarem cadastrados.`
+        : `${novos.length} motoristas importados.`,
+    );
+
   };
 
   const lista = motoristas.filter((m) =>
