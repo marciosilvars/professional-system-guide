@@ -156,7 +156,8 @@ function EscalasPage() {
     toast.success(`Prévia gerada com ${novos.length} vagas.`);
   };
 
-  const persistir = async (status: "previa" | "definitiva") => {
+  const persistir = async (status: "previa" | "definitiva", lista: NovoItem[] = itens) => {
+    const itens = lista;
     if (itens.length === 0) {
       toast.warning("Gere a prévia da escala antes de salvar.");
       return;
