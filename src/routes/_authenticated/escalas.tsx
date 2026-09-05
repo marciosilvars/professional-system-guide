@@ -427,6 +427,7 @@ function EscalasPage() {
                     <th className="py-2 pr-3">Veículo</th>
                     <th className="py-2 pr-3">Onda</th>
                     <th className="py-2 pr-3">Situação</th>
+                    <th className="py-2">Ação</th>
                   </tr>
                 </thead>
                 <tbody>
