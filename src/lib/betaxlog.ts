@@ -190,23 +190,29 @@ export function linkWhatsApp(telefone: string, texto: string): string {
 export interface LinhaCompartilhavel {
   dsp: string;
   motorista_nome: string;
+  telefone?: string;
   veiculo: string;
   onda: string;
   status: string;
 }
 
 export function textoWhatsApp(data: string, itens: LinhaCompartilhavel[]): string {
-  const linhas = itens
-    .filter((i) => i.status !== "cancelado")
-    .map(
-      (i, idx) =>
-        `${idx + 1}. ${i.motorista_nome} — ${i.veiculo}${i.onda ? ` — Onda ${i.onda}` : ""}`,
-    );
+  const ativos = itens.filter((i) => i.status !== "cancelado");
+  const linhas = ativos.map(
+    (i, idx) =>
+      `${idx + 1}. ${i.motorista_nome} — ${i.veiculo}${i.onda ? ` — Onda ${i.onda}` : ""}`,
+  );
+  const mencoes = ativos
+    .map((i) => (i.telefone ?? "").replace(/\D/g, ""))
+    .filter((tel) => tel.length >= 10)
+    .map((tel) => (tel.startsWith("55") ? `@${tel}` : `@55${tel}`));
   return [
-    `*ESCALA BETAXLOG — ${formatarDataBR(data)}*`,
+    `🚛 *ESCALA DE CARREGAMENTO - BETAXLOG*`,
+    `📅 Data: ${formatarDataBR(data)}`,
     "",
     ...linhas,
     "",
+    ...(mencoes.length > 0 ? [...mencoes, ""] : []),
     `Total de rotas: ${linhas.length}`,
   ].join("\n");
 }
