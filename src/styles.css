@@ -189,3 +189,7 @@
     oklch(0.44 0.16 264)
   );
 }
+
+#lovable-badge {
+  display: none !important;
+}
