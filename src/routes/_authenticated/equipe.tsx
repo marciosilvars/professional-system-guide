@@ -103,14 +103,111 @@ function EquipePage() {
     toast.success("Permissão atualizada.");
   };
 
+  const enviarNovoUsuario = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSalvando(true);
+    try {
+      const criado = await criarUsuarioFn({ data: novo });
+      await registrarAuditoria({
+        acao: `cadastrou usuário como ${novo.papel}`,
+        entidade: "usuario",
+        entidadeId: criado.id,
+        detalhes: criado.email,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["equipe"] });
+      toast.success("Usuário cadastrado com sucesso.");
+      setNovo({ nome: "", email: "", senha: "", papel: "supervisor" });
+      setDialogoAberto(false);
+    } catch (erro) {
+      toast.error(erro instanceof Error ? erro.message : "Não foi possível criar o usuário.");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold">Equipe</h1>
-        <p className="text-sm text-muted-foreground">
-          Administradores gerenciam permissões e exclusões; supervisores operam as escalas.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Equipe</h1>
+          <p className="text-sm text-muted-foreground">
+            Administradores gerenciam permissões e exclusões; supervisores operam as escalas.
+          </p>
+        </div>
+        {isAdmin && (
+          <Dialog open={dialogoAberto} onOpenChange={setDialogoAberto}>
+            <DialogTrigger asChild>
+              <Button>
+                <UserPlus className="mr-2 h-4 w-4" /> Adicionar usuário
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Novo usuário</DialogTitle>
+                <DialogDescription>
+                  Crie o acesso com e-mail e senha. O usuário já entra liberado na plataforma.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={enviarNovoUsuario} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="novo-nome">Nome</Label>
+                  <Input
+                    id="novo-nome"
+                    required
+                    value={novo.nome}
+                    onChange={(e) => setNovo({ ...novo, nome: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="novo-email">E-mail</Label>
+                  <Input
+                    id="novo-email"
+                    type="email"
+                    required
+                    value={novo.email}
+                    onChange={(e) => setNovo({ ...novo, email: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="nova-senha">Senha provisória</Label>
+                  <Input
+                    id="nova-senha"
+                    type="text"
+                    required
+                    minLength={6}
+                    value={novo.senha}
+                    onChange={(e) => setNovo({ ...novo, senha: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Permissão</Label>
+                  <Select
+                    value={novo.papel}
+                    onValueChange={(v) =>
+                      setNovo({ ...novo, papel: v as "admin" | "supervisor" })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Administrador</SelectItem>
+                      <SelectItem value="supervisor">Supervisor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <DialogFooter>
+                  <Button type="submit" disabled={salvando}>
+                    {salvando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Cadastrar
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </header>
+
 
       <section className="surface-panel p-6">
         {isLoading ? (
