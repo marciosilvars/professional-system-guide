@@ -58,6 +58,15 @@ interface Membro {
 function EquipePage() {
   const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
+  const criarUsuarioFn = useServerFn(criarUsuario);
+  const [dialogoAberto, setDialogoAberto] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [novo, setNovo] = useState<{
+    nome: string;
+    email: string;
+    senha: string;
+    papel: "admin" | "supervisor";
+  }>({ nome: "", email: "", senha: "", papel: "supervisor" });
 
   const { data: membros = [], isLoading } = useQuery({
     queryKey: ["equipe"],
