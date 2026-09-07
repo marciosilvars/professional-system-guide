@@ -102,25 +102,59 @@ function MotoristasPage() {
 
   const salvarEdicao = async () => {
     if (!editando) return;
-    const { error } = await supabase
+    const original = motoristas.find((m) => m.id === editando.id);
+    const nome = editando.nome.trim();
+    if (!nome) {
+      toast.error("Informe o nome do motorista.");
+      return;
+    }
+    const chave = (v: string) => v.trim().replace(/\s+/g, " ").toLowerCase();
+    if (motoristas.some((m) => m.id !== editando.id && chave(m.nome) === chave(nome))) {
+      toast.error("Motorista já cadastrado.");
+      return;
+    }
+    const { data: atualizado, error } = await supabase
       .from("motoristas")
       .update({
-        nome: editando.nome.trim(),
+        nome,
         telefone: editando.telefone,
         tipo_veiculo: editando.tipo_veiculo,
         prioritario: editando.prioritario,
         ativo: editando.ativo,
       })
-      .eq("id", editando.id);
-    if (error) {
+      .eq("id", editando.id)
+      .select()
+      .maybeSingle();
+    if (error || !atualizado) {
       toast.error("Não foi possível salvar as alterações.");
       return;
+    }
+    const mudancas: string[] = [];
+    const comparar = (campo: string, antes: string, depois: string) => {
+      if (antes !== depois) mudancas.push(`${campo}: ${antes} → ${depois}`);
+    };
+    if (original) {
+      comparar("Nome", original.nome, atualizado.nome);
+      comparar("Telefone", original.telefone || "—", atualizado.telefone || "—");
+      comparar("Veículo", original.tipo_veiculo, atualizado.tipo_veiculo);
+      comparar(
+        "Prioridade",
+        original.prioritario ? "Prioritário" : "Não prioritário",
+        atualizado.prioritario ? "Prioritário" : "Não prioritário",
+      );
+      comparar(
+        "Situação",
+        original.ativo ? "Ativo" : "Inativo",
+        atualizado.ativo ? "Ativo" : "Inativo",
+      );
     }
     await registrarAuditoria({
       acao: "editou motorista",
       entidade: "motorista",
       entidadeId: editando.id,
-      detalhes: editando.nome,
+      detalhes: mudancas.length
+        ? `${atualizado.nome} — ${mudancas.join("; ")}`
+        : `${atualizado.nome} — sem alterações de campos`,
     });
     setEditando(null);
     await recarregar();
