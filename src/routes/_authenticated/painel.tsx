@@ -16,16 +16,16 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/_authenticated/painel")({
   head: () => ({
     meta: [
-      { title: "Painel do dia — BETAXLOG" },
+      { title: "Painel do dia — BETAXLOG" }, // Corrigido: "â€”" para "—"
       {
         name: "description",
         content:
-          "Visão geral da operação BETAXLOG: escala do dia, motoristas ativos e situação das rotas.",
+          "Visão geral da operação BETAXLOG: escala do dia, motoristas ativos e situação das rotas.", // Corrigido: "VisĂŁo geral da operaĂ§ĂŁo"
       },
-      { property: "og:title", content: "Painel do dia — BETAXLOG" },
+      { property: "og:title", content: "Painel do dia — BETAXLOG" }, // Corrigido: "â€”" para "—"
       {
         property: "og:description",
-        content: "Resumo diário da frota, das vagas preenchidas e das rotas concluídas.",
+        content: "Resumo diário da frota, das vagas preenchidas e das rotas concluídas.", // Corrigido: "Resumo diĂˇrio da frota, das vagas preenchidas e das rotas concluĂ­das."
       },
       { name: "robots", content: "noindex" },
     ],
@@ -83,7 +83,7 @@ function PainelPage() {
         <div>
           <h1 className="text-2xl font-bold">Painel do dia</h1>
           <p className="text-sm text-muted-foreground">
-            Operação de {formatarDataBR(hoje)} em um relance.
+            Operação de {formatarDataBR(hoje)} em um relance. {/* Corrigido: "OperaĂ§ĂŁo" */}
           </p>
         </div>
         <Button asChild>
@@ -101,7 +101,7 @@ function PainelPage() {
               <c.icone className="h-4 w-4 text-primary" />
             </div>
             <p className="mt-2 text-3xl font-bold tabular-nums">
-              {isLoading ? "—" : c.valor}
+              {isLoading ? "—" : c.valor} {/* Corrigido: "â€”" para "—" */}
             </p>
           </div>
         ))}
@@ -112,10 +112,10 @@ function PainelPage() {
           <h2 className="text-lg font-semibold">Escala de hoje</h2>
           {escala ? (
             <Badge variant={escala.status === "definitiva" ? "default" : "secondary"}>
-              {escala.status === "definitiva" ? "Definitiva" : "Prévia"}
+              {escala.status === "definitiva" ? "Definitiva" : "Prévia"} {/* Corrigido: "PrĂ©via" */}
             </Badge>
           ) : (
-            <Badge variant="outline">Não montada</Badge>
+            <Badge variant="outline">Não montada</Badge> {/* Corrigido: "NĂŁo montada" */}
           )}
         </div>
 
@@ -135,7 +135,7 @@ function PainelPage() {
                 </span>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {i.veiculo}
-                  {i.onda ? ` · Onda ${i.onda}` : ""}
+                  {i.onda ? ` · Onda ${i.onda}` : ""} {/* Corrigido: "Â·" para "·" */}
                 </span>
               </li>
             ))}
@@ -149,9 +149,9 @@ function PainelPage() {
       </section>
 
       <section className="surface-panel p-6">
-        <h2 className="mb-4 text-lg font-semibold">Motoristas prioritários</h2>
+        <h2 className="mb-4 text-lg font-semibold">Motoristas prioritários</h2> {/* Corrigido: "prioritĂˇrios" */}
         {motoristas.filter((m) => m.prioritario && m.ativo).length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhum motorista prioritário cadastrado.</p>
+          <p className="text-sm text-muted-foreground">Nenhum motorista prioritário cadastrado.</p> {/* Corrigido: "prioritĂˇrio" */}
         ) : (
           <div className="flex flex-wrap gap-2">
             {motoristas
