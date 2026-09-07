@@ -81,17 +81,6 @@ function AuthPage() {
     toast.success("Conta criada! Verifique seu e-mail se a confirmação for solicitada.");
   };
 
-  const entrarComGoogle = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-    if (result.error) {
-      toast.error("Não foi possível entrar com o Google.");
-      return;
-    }
-    if (result.redirected) return;
-    void navigate({ to: "/escalas" });
-  };
 
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
