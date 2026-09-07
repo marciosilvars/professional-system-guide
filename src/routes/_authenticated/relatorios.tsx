@@ -24,12 +24,12 @@ import { Label } from "@/components/ui/label";
 export const Route = createFileRoute("/_authenticated/relatorios")({
   head: () => ({
     meta: [
-      { title: "Relatórios — BETAXLOG" },
+      { title: "Relatórios — BETAXLOG" }, // Corrigido: "Relatórios â€” BETAXLOG"
       {
         name: "description",
         content: "Indicadores de escalas, rotas concluídas, cancelamentos e ranking de motoristas.",
       },
-      { property: "og:title", content: "Relatórios — BETAXLOG" },
+      { property: "og:title", content: "Relatórios — BETAXLOG" }, // Corrigido: "Relatórios â€” BETAXLOG"
       {
         property: "og:description",
         content: "Acompanhe produtividade da frota e exporte relatórios em Excel ou PDF.",
