@@ -185,16 +185,9 @@ function AuthPage() {
             </TabsContent>
           </Tabs>
 
-          <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-wider text-muted-foreground">
-            <span className="h-px flex-1 bg-border" /> ou <span className="h-px flex-1 bg-border" />
-          </div>
-
-          <Button variant="outline" className="w-full" onClick={entrarComGoogle}>
-            Continuar com Google
-          </Button>
-
           <p className="mt-6 text-center text-xs text-muted-foreground">
-            O primeiro cadastro da operação recebe acesso de administrador.
+            O primeiro cadastro da operação recebe acesso de administrador. Depois disso,
+            novos acessos são criados pelo administrador na aba Equipe.
           </p>
         </div>
       </section>
