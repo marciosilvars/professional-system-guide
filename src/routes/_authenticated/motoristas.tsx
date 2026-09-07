@@ -245,7 +245,7 @@ function MotoristasPage() {
 
       <section className="surface-panel p-6">
         <h2 className="mb-4 text-lg font-semibold">Novo motorista</h2>
-        <form onSubmit={cadastrar} className="grid gap-4 md:grid-cols-4">
+        <form onSubmit={cadastrar} className="max-h-80 overflow-y-auto pr-1 grid gap-4 md:grid-cols-4">
           <div className="space-y-2 md:col-span-2">
             <Label htmlFor="nome">Nome completo</Label>
             <Input
@@ -388,7 +388,7 @@ function MotoristasPage() {
             <DialogTitle>Editar motorista</DialogTitle>
           </DialogHeader>
           {editando && (
-            <div className="space-y-4">
+            <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
               <div className="space-y-2">
                 <Label htmlFor="e-nome">Nome</Label>
                 <Input
