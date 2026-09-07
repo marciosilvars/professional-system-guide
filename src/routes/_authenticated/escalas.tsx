@@ -451,7 +451,7 @@ function EscalasPage() {
                           type="number"
                           min={0}
                           value={item.onda}
-                          onChange={(e) => atualizarItem(idx, { onda: Number(e.target.value) || 0 })}
+                          onChange={(e) => atualizarItem(idx, { onda: e.target.value })}
                           disabled={definitiva}
                         />
                       </td>
