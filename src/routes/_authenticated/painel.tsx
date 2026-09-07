@@ -83,7 +83,7 @@ function PainelPage() {
         <div>
           <h1 className="text-2xl font-bold">Painel do dia</h1>
           <p className="text-sm text-muted-foreground">
-            Operação de {formatarDataBR(hoje)} em um relance. {/* Corrigido: "OperaĂ§ĂŁo" */}
+            Operação de {formatarDataBR(hoje)} em um relance.
           </p>
         </div>
         <Button asChild>
@@ -101,7 +101,7 @@ function PainelPage() {
               <c.icone className="h-4 w-4 text-primary" />
             </div>
             <p className="mt-2 text-3xl font-bold tabular-nums">
-              {isLoading ? "—" : c.valor} {/* Corrigido: "â€”" para "—" */}
+              {isLoading ? "—" : c.valor}
             </p>
           </div>
         ))}
@@ -112,10 +112,10 @@ function PainelPage() {
           <h2 className="text-lg font-semibold">Escala de hoje</h2>
           {escala ? (
             <Badge variant={escala.status === "definitiva" ? "default" : "secondary"}>
-              {escala.status === "definitiva" ? "Definitiva" : "Prévia"} {/* Corrigido: "PrĂ©via" */}
+              {escala.status === "definitiva" ? "Definitiva" : "Prévia"}
             </Badge>
           ) : (
-            <Badge variant="outline">Não montada</Badge> {/* Corrigido: "NĂŁo montada" */}
+            <Badge variant="outline">Não montada</Badge>
           )}
         </div>
 
@@ -135,7 +135,7 @@ function PainelPage() {
                 </span>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {i.veiculo}
-                  {i.onda ? ` · Onda ${i.onda}` : ""} {/* Corrigido: "Â·" para "·" */}
+                  {i.onda ? ` · Onda ${i.onda}` : ""}
                 </span>
               </li>
             ))}
@@ -149,9 +149,9 @@ function PainelPage() {
       </section>
 
       <section className="surface-panel p-6">
-        <h2 className="mb-4 text-lg font-semibold">Motoristas prioritários</h2> {/* Corrigido: "prioritĂˇrios" */}
+        <h2 className="mb-4 text-lg font-semibold">Motoristas prioritários</h2>
         {motoristas.filter((m) => m.prioritario && m.ativo).length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhum motorista prioritário cadastrado.</p> {/* Corrigido: "prioritĂˇrio" */}
+          <p className="text-sm text-muted-foreground">Nenhum motorista prioritário cadastrado.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
             {motoristas
