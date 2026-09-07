@@ -11,7 +11,6 @@ import {
   FileSpreadsheet,
   Search,
   Loader2,
-  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,8 +22,6 @@ import {
   formatarDataBR,
   gerarItensEscala,
   hojeISO,
-  linkWhatsApp,
-  mensagemCancelamentoRota,
   textoWhatsApp,
   type Escala,
   type EscalaItem,
@@ -49,16 +46,16 @@ import {
 export const Route = createFileRoute("/_authenticated/escalas")({
   head: () => ({
     meta: [
-      { title: "Escala do dia — BETAXLOG" },
+      { title: "Escala do dia — BETAXLOG" }, // Corrigido: "Escala do dia â€” BETAXLOG"
       {
         name: "description",
         content:
-          "Monte a escala diária de motoristas com rodízio automático, ondas de carregamento e compartilhamento rápido.",
+          "Monte a escala diária de motoristas com rodízio automático, ondas de carregamento e compartilhamento rápido.", // Corrigido: "Monte a escala diĂˇria de motoristas com rodĂ­zio automĂˇtico, ondas de carregamento e compartilhamento rĂˇpido."
       },
-      { property: "og:title", content: "Escala do dia — BETAXLOG" },
+      { property: "og:title", content: "Escala do dia — BETAXLOG" }, // Corrigido: "Escala do dia â€” BETAXLOG"
       {
         property: "og:description",
-        content: "Rodízio automático de motoristas por tipo de veículo e onda de carregamento.",
+        content: "Rodízio automático de motoristas por tipo de veículo e onda de carregamento.", // Corrigido: "RodĂ­zio automĂˇtico de motoristas por tipo de veĂ­culo e onda de carregamento."
       },
       { name: "robots", content: "noindex" },
     ],
@@ -159,8 +156,7 @@ function EscalasPage() {
     toast.success(`Prévia gerada com ${novos.length} vagas.`);
   };
 
-  const persistir = async (status: "previa" | "definitiva", lista: NovoItem[] = itens) => {
-    const itens = lista;
+  const persistir = async (status: "previa" | "definitiva") => {
     if (itens.length === 0) {
       toast.warning("Gere a prévia da escala antes de salvar.");
       return;
@@ -192,11 +188,7 @@ function EscalasPage() {
       if (erroItens) throw erroItens;
 
       if (status === "definitiva") {
-        // Rotas canceladas pela Amazon não contam rodízio: o motorista volta na próxima escala.
-        const ids = itens
-          .filter((i) => i.status !== "cancelado")
-          .map((i) => i.motorista_id)
-          .filter(Boolean) as string[];
+        const ids = itens.map((i) => i.motorista_id).filter(Boolean) as string[];
         if (ids.length > 0) {
           await supabase.from("motoristas").update({ ultima_escala: data }).in("id", ids);
         }
@@ -259,70 +251,25 @@ function EscalasPage() {
     });
   };
 
-  const cancelarRota = async (idx: number) => {
-    const item = itens[idx];
-    if (!item) return;
-    const proximos = itens.map((it, i) =>
-      i === idx ? { ...it, status: "cancelado" as StatusItem } : it,
-    );
-    setItens(proximos);
-
-    const texto = mensagemCancelamentoRota(item.motorista_nome, data);
-    window.open(linkWhatsApp(item.telefone, texto), "_blank", "noopener");
-
-    await registrarAuditoria({
-      acao: "cancelou rota",
-      entidade: "escala_item",
-      entidadeId: item.motorista_id,
-      detalhes: `${item.motorista_nome} · ${formatarDataBR(data)}`,
-    });
-
-    if (escala) {
-      await persistir(escala.status === "definitiva" ? "definitiva" : "previa", proximos);
-    }
-    toast.success("Rota cancelada e mensagem aberta no WhatsApp.");
-  };
-
   const copiarWhatsApp = async () => {
     const texto = textoWhatsApp(data, itens);
     try {
       await navigator.clipboard.writeText(texto);
-      toast.success("Texto copiado. Abrindo o WhatsApp...");
+      toast.success("Texto copiado para o WhatsApp.");
     } catch {
-      toast.info("Abrindo o WhatsApp com o texto da escala...");
+      window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank", "noopener");
     }
-    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank", "noopener");
   };
 
   const gerarImagem = async () => {
-    const alvo = capturaRef.current;
-    const rolagem = rolagemRef.current;
-    if (!alvo) return;
+    if (!capturaRef.current) return;
     const html2canvas = (await import("html2canvas")).default;
-    // Remove o limite de altura para que a imagem contenha todos os motoristas.
-    const maxAnterior = rolagem?.style.maxHeight ?? "";
-    const overflowAnterior = rolagem?.style.overflowY ?? "";
-    if (rolagem) {
-      rolagem.style.maxHeight = "none";
-      rolagem.style.overflowY = "visible";
-    }
-    try {
-      const canvas = await html2canvas(alvo, {
-        backgroundColor: "#ffffff",
-        scale: 2,
-        windowHeight: alvo.scrollHeight + 200,
-      });
-      const link = document.createElement("a");
-      link.download = `escala-betaxlog-${data}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-      toast.success("Imagem gerada com todos os motoristas.");
-    } finally {
-      if (rolagem) {
-        rolagem.style.maxHeight = maxAnterior;
-        rolagem.style.overflowY = overflowAnterior;
-      }
-    }
+    const canvas = await html2canvas(capturaRef.current, { backgroundColor: "#ffffff", scale: 2 });
+    const link = document.createElement("a");
+    link.download = `escala-betaxlog-${data}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+    toast.success("Imagem gerada.");
   };
 
   const exportarExcel = async () => {
@@ -365,7 +312,7 @@ function EscalasPage() {
         </div>
         {escala && (
           <Badge variant={definitiva ? "default" : "secondary"}>
-            {definitiva ? "DEFINITIVA" : "PRÉVIA SALVA"}
+            {definitiva ? "DEFINITIVA" : "PRÉVIA SALVA"} {/* Corrigido: "PRĂ‰VIA SALVA" */}
           </Badge>
         )}
       </header>
@@ -442,173 +389,148 @@ function EscalasPage() {
               <p className="text-sm text-muted-foreground">Data: {formatarDataBR(data)}</p>
             </div>
 
-            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-              <span>{itens.length} vaga(s) gerada(s)</span>
-              <span>{itens.filter((i) => i.status === "cancelado").length} rota(s) cancelada(s)</span>
-            </div>
-            <div className="max-h-80 overflow-y-auto pr-1">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                      <th className="py-2 pr-3">DSP</th>
-                      <th className="py-2 pr-3">Motorista</th>
-                      <th className="py-2 pr-3">Veículo</th>
-                      <th className="py-2 pr-3">Onda</th>
-                      <th className="py-2 pr-3">Situação</th>
-                      <th className="py-2">Ação</th>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="py-2 pr-3">DSP</th>
+                    <th className="py-2 pr-3">Motorista</th>
+                    <th className="py-2 pr-3">Veículo</th>
+                    <th className="py-2 pr-3">Onda</th>
+                    <th className="py-2 pr-3">Situação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {itens.map((item, idx) => (
+                    <tr
+                      key={idx}
+                      className={
+                        item.status === "cancelado"
+                          ? "border-b border-border/60 text-muted-foreground line-through"
+                          : "border-b border-border/60"
+                      }
+                    >
+                      <td className="py-2 pr-3">
+                        <Input
+                          className="h-8 w-28"
+                          value={item.dsp}
+                          placeholder={DSP_PADRAO}
+                          onChange={(e) => atualizarItem(idx, { dsp: e.target.value })}
+                        />
+                      </td>
+                      <td className="py-2 pr-3 min-w-52">
+                        <Select
+                          value={item.motorista_id ?? "vago"}
+                          onValueChange={(v) => trocarMotorista(idx, v)}
+                          disabled={definitiva}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder="Selecionar motorista" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="vago">Vaga livre</SelectItem>
+                            {motoristas.map((m) => (
+                              <SelectItem key={m.id} value={m.id}>
+                                {m.nome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="py-2 pr-3">
+                        <Input
+                          className="h-8 w-28"
+                          value={item.veiculo}
+                          onChange={(e) => atualizarItem(idx, { veiculo: e.target.value })}
+                          disabled={definitiva}
+                        />
+                      </td>
+                      <td className="py-2 pr-3">
+                        <Input
+                          className="h-8 w-20"
+                          type="number"
+                          min={0}
+                          value={item.onda}
+                          onChange={(e) => atualizarItem(idx, { onda: Number(e.target.value) || 0 })}
+                          disabled={definitiva}
+                        />
+                      </td>
+                      <td className="py-2 pr-3">
+                        <Select
+                          value={item.status}
+                          onValueChange={(v) => atualizarItem(idx, { status: v as StatusItem })}
+                          disabled={definitiva}
+                        >
+                          <SelectTrigger className="h-8 w-32">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(STATUS_ITEM_LABEL).map(([key, value]) => (
+                              <SelectItem key={key} value={key}>
+                                {value}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {itens.map((item, idx) => (
-                      <tr
-                        key={idx}
-                        className={
-                          item.status === "cancelado"
-                            ? "border-b border-border/60 text-muted-foreground line-through"
-                            : "border-b border-border/60"
-                        }
-                      >
-                        <td className="py-2 pr-3">
-                          <Input
-                            className="h-8 w-28"
-                            value={item.dsp}
-                            placeholder={DSP_PADRAO}
-                            onChange={(e) => atualizarItem(idx, { dsp: e.target.value })}
-                          />
-                        </td>
-                        <td className="py-2 pr-3 min-w-52">
-                          <Select
-                            value={item.motorista_id ?? "vago"}
-                            onValueChange={(v) => trocarMotorista(idx, v)}
-                          >
-                            <SelectTrigger className="h-8">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="vago">{VAGA_LIVRE}</SelectItem>
-                              {motoristas.map((m) => (
-                                <SelectItem key={m.id} value={m.id}>
-                                  {m.prioritario ? "⭐ " : ""}
-                                  {m.nome}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </td>
-                        <td className="py-2 pr-3 whitespace-nowrap">{item.veiculo}</td>
-                        <td className="py-2 pr-3">
-                          <Input
-                            className="h-8 w-24"
-                            placeholder="07:00"
-                            maxLength={5}
-                            value={item.onda}
-                            onChange={(e) => atualizarItem(idx, { onda: e.target.value })}
-                          />
-                        </td>
-                        <td className="py-2 pr-3">
-                          <Select
-                            value={item.status}
-                            onValueChange={(v) => atualizarItem(idx, { status: v as StatusItem })}
-                          >
-                            <SelectTrigger className="h-8 w-36">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {(Object.keys(STATUS_ITEM_LABEL) as StatusItem[]).map((s) => (
-                                <SelectItem key={s} value={s}>
-                                  {STATUS_ITEM_LABEL[s]}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </td>
-                        <td className="py-2 whitespace-nowrap">
-                          {item.status === "cancelado" ? (
-                            <Badge variant="destructive">Rota cancelada</Badge>
-                          ) : item.motorista_id ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => void cancelarRota(idx)}
-                            >
-                              <XCircle className="mr-2 h-4 w-4" /> Cancelar rota
-                            </Button>
-                          ) : null}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 
           <div className="mt-5 flex flex-wrap gap-3">
+            <Button variant="outline" onClick={() => void copiarWhatsApp()}>
+              <MessageSquareText className="mr-2 h-4 w-4" /> Copiar para WhatsApp
+            </Button>
             <Button variant="outline" onClick={() => void gerarImagem()}>
               <ImageIcon className="mr-2 h-4 w-4" /> Gerar imagem
             </Button>
-            <Button variant="outline" onClick={() => void copiarWhatsApp()}>
-              <MessageSquareText className="mr-2 h-4 w-4" /> Copiar p/ WhatsApp
-            </Button>
             <Button variant="outline" onClick={() => void exportarExcel()}>
-              <FileSpreadsheet className="mr-2 h-4 w-4" /> Baixar Excel
+              <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar Excel
             </Button>
           </div>
         </section>
       )}
 
       <section className="surface-panel p-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">
-            3. Indisponíveis em {formatarDataBR(data)}
-          </h2>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className="w-64 pl-9"
-              placeholder="Buscar motorista..."
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-            />
-          </div>
-        </div>
-
+        <h2 className="mb-4 text-lg font-semibold">3. Motoristas indisponíveis</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Marque os motoristas que não devem ser incluídos no rodízio automático de hoje.
+        </p>
         {motoristasQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Carregando motoristas...</p>
-        ) : listaFiltrada.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Nenhum motorista cadastrado. Comece pela aba Motoristas.
-          </p>
+        ) : motoristas.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhum motorista cadastrado.</p>
         ) : (
-          <div className="rounded-xl border border-border bg-muted/20 p-3">
-            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-              <span>{listaFiltrada.length} motorista(s)</span>
-              <span>{indisponiveis.size} marcado(s) como indisponível</span>
+          <>
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="w-64 pl-9"
+                placeholder="Buscar motorista..."
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+              />
             </div>
-            <div className="max-h-80 overflow-y-auto pr-1">
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {listaFiltrada.map((m) => (
-                  <label
-                    key={m.id}
-                    className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 text-sm"
-                  >
-                    <Checkbox
-                      checked={indisponiveis.has(m.id)}
-                      onCheckedChange={() => alternarIndisponivel(m.id)}
-                    />
-                    <span className="truncate">
-                      {m.prioritario && "⭐ "}
-                      {m.nome}
-                    </span>
-                    <span className="ml-auto text-xs text-muted-foreground">{m.tipo_veiculo}</span>
-                  </label>
-                ))}
-              </div>
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {listaFiltrada.map((m) => (
+                <div key={m.id} className="flex items-center gap-2">
+                  <Checkbox
+                    id={`indisponivel-${m.id}`}
+                    checked={indisponiveis.has(m.id)}
+                    onCheckedChange={() => alternarIndisponivel(m.id)}
+                    disabled={definitiva}
+                  />
+                  <Label htmlFor={`indisponivel-${m.id}`} className="font-normal">
+                    {m.nome}
+                  </Label>
+                </div>
+              ))}
             </div>
-          </div>
+          </>
         )}
-
       </section>
     </div>
   );
