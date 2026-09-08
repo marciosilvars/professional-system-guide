@@ -89,7 +89,7 @@ function EquipePage() {
     queryKey: ["equipe"],
     queryFn: async (): Promise<Membro[]> => {
       const [res1, res2] = await Promise.all([
-        supabase.from("profiles").select("id, nome, email, telefone").order("nome"),
+        supabase.from("profiles").select("*").order("nome"),
         supabase.from("user_roles").select("user_id, role"),
       ]);
       if (res1.error) {
