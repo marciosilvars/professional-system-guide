@@ -1,24 +1,31 @@
-# Professional System Builder
+# BETAXLOG — Sistema de Gestão de Escalas
 
-analise esse sistema quero montar um sistema profissional
+Sistema profissional para gerenciamento de escalas de motoristas da **BETAXLOG**.
 
-This project was built with [Lovable](https://lovable.dev).
+## Funcionalidades
 
-## Build with Lovable
+- **Escalas**: Montagem de escalas com rodízio automático e ondas de carregamento
+- **Motoristas**: Cadastro e gestão completa de motoristas com lixeira
+- **Equipe**: Gerenciamento de usuários e controle de acesso
+- **Painel**: Indicadores e métricas da operação
+- **Relatórios**: Histórico auditável de todas as ações
+- **Segurança**: Controle de acesso por perfil (administrador / operador)
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/8b5b0952-d92f-4771-81cd-fbf068f1c38e).
+## Tecnologias
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+- [TanStack Start](https://tanstack.com/start) — Framework SSR
+- [Supabase](https://supabase.com) — Banco de dados e autenticação
+- [Shadcn/ui](https://ui.shadcn.com) — Componentes de interface
+- [Vite](https://vitejs.dev) — Build tool
+- [Vercel](https://vercel.com) — Hospedagem
 
-## Development
+## Desenvolvimento local
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+```bash
+npm install
 npm run dev
 ```
+
+---
+
+© BETAXLOG. Todos os direitos reservados.
