@@ -176,7 +176,7 @@ function EquipePage() {
 
   const enviarEmailRecuperacao = async (membro: Membro) => {
     const { error } = await supabase.auth.resetPasswordForEmail(membro.email, {
-      redirectTo: `${window.location.origin}/auth`,
+      redirectTo: `${window.location.origin}/reset-password`,
     });
     if (error) {
       toast.error("Não foi possível enviar o e-mail de recuperação.");
