@@ -6,7 +6,8 @@ const schema = z.object({
   nome: z.string().trim().min(2, "Informe o nome"),
   email: z.string().trim().email("E-mail inválido"),
   senha: z.string().min(6, "A senha precisa ter ao menos 6 caracteres"),
-  papel: z.enum(["admin", "supervisor"]),
+  papel: z.enum(["admin", "operador"]),
+  telefone: z.string().trim().optional(),
 });
 
 export const criarUsuario = createServerFn({ method: "POST" })
@@ -40,7 +41,7 @@ export const criarUsuario = createServerFn({ method: "POST" })
 
     await supabaseAdmin
       .from("profiles")
-      .upsert({ id: novoId, nome: data.nome, email: data.email });
+      .upsert({ id: novoId, nome: data.nome, email: data.email, ...(data.telefone ? { telefone: data.telefone } : {}) });
 
     await supabaseAdmin.from("user_roles").delete().eq("user_id", novoId);
     const { error: erroRole } = await supabaseAdmin
@@ -50,3 +51,32 @@ export const criarUsuario = createServerFn({ method: "POST" })
 
     return { id: novoId, nome: data.nome, email: data.email, papel: data.papel };
   });
+
+const alterarSenhaSchema = z.object({
+  userId: z.string().uuid(),
+  novaSenha: z.string().min(6, "A senha precisa ter ao menos 6 caracteres"),
+});
+
+export const alterarSenhaUsuario = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => alterarSenhaSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    // Permite: admin alterando qualquer operador, ou o próprio usuário alterando sua senha
+    const isSelf = context.userId === data.userId;
+    if (!isSelf) {
+      const { data: ehAdmin, error: erroPapel } = await context.supabase.rpc("has_role", {
+        _user_id: context.userId,
+        _role: "admin",
+      });
+      if (erroPapel) throw new Error("Não foi possível validar suas permissões.");
+      if (!ehAdmin) throw new Error("Apenas administradores podem alterar a senha de outros usuários.");
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+      password: data.novaSenha,
+    });
+    if (error) throw new Error(error.message ?? "Não foi possível alterar a senha.");
+    return { ok: true };
+  });
+

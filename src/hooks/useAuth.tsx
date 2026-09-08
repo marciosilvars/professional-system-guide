@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-export type AppRole = "admin" | "supervisor";
+export type AppRole = "admin" | "operador";
 
 interface AuthState {
   user: User | null;

@@ -83,7 +83,7 @@ function AppShell() {
         <div className="border-t border-sidebar-border px-5 py-4 text-sm">
           <p className="truncate font-medium">{nome || user?.email}</p>
           <p className="text-xs text-sidebar-foreground/60">
-            {isAdmin ? "Administrador" : "Supervisor"}
+            {isAdmin ? "Administrador" : "Operador"}
           </p>
           <Button
             variant="ghost"
