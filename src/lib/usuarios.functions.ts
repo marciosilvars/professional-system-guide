@@ -160,7 +160,11 @@ export const excluirUsuario = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
-    if (error) throw new Error(`Erro Auth: ${error.message}`);
+    if (error) {
+      const url = process.env['SUPABASE_URL']?.substring(0, 30) || 'none';
+      const keyPrefix = process.env['SUPABASE_SERVICE_ROLE_KEY']?.substring(0, 15) || 'none';
+      throw new Error(`Erro Auth: ${error.message} (URL: ${url}..., Key: ${keyPrefix}...)`);
+    }
 
     // Limpeza forçada caso a chave estrangeira falhe (apenas para garantir)
     await supabaseAdmin.from("profiles").delete().eq("id", data.userId);
