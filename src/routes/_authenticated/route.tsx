@@ -124,6 +124,17 @@ function AppShell() {
         <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-8">
           <Outlet />
         </main>
+
+        <footer className="border-t border-border bg-card px-4 py-4 text-center text-xs text-muted-foreground mt-auto">
+          <p>
+            &copy; {new Date().getFullYear()}{" "}
+            <a href="mailto:marciomsilva.dev@gmail.com" className="font-medium hover:underline text-primary/80 transition-colors">
+              MMS Sistemas
+            </a>
+            . Todos os direitos reservados.
+          </p>
+          <p className="mt-1">Gestão de Escalas | Desenvolvido para BETAXLOG</p>
+        </footer>
       </div>
     </div>
   );
