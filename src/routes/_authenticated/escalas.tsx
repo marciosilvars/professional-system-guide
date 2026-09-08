@@ -514,20 +514,22 @@ function EscalasPage() {
                 onChange={(e) => setBusca(e.target.value)}
               />
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {listaFiltrada.map((m) => (
-                <div key={m.id} className="flex items-center gap-2">
-                  <Checkbox
-                    id={`indisponivel-${m.id}`}
-                    checked={indisponiveis.has(m.id)}
-                    onCheckedChange={() => alternarIndisponivel(m.id)}
-                    disabled={definitiva}
-                  />
-                  <Label htmlFor={`indisponivel-${m.id}`} className="font-normal">
-                    {m.nome}
-                  </Label>
-                </div>
-              ))}
+            <div className="max-h-72 overflow-y-auto rounded-md border border-border p-3">
+              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {listaFiltrada.map((m) => (
+                  <div key={m.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`indisponivel-${m.id}`}
+                      checked={indisponiveis.has(m.id)}
+                      onCheckedChange={() => alternarIndisponivel(m.id)}
+                      disabled={definitiva}
+                    />
+                    <Label htmlFor={`indisponivel-${m.id}`} className="font-normal">
+                      {m.nome}
+                    </Label>
+                  </div>
+                ))}
+              </div>
             </div>
           </>
         )}
