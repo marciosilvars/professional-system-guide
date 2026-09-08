@@ -8,7 +8,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -34,8 +33,10 @@ function AuthPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
-  const [nome, setNome] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [mostraRecuperacao, setMostraRecuperacao] = useState(false);
+  const [emailRecuperacao, setEmailRecuperacao] = useState("");
+  const [enviandoRecuperacao, setEnviandoRecuperacao] = useState(false);
 
   useEffect(() => {
     if (!loading && user) void navigate({ to: "/escalas" });
@@ -58,29 +59,21 @@ function AuthPage() {
     void navigate({ to: "/escalas" });
   };
 
-  const cadastrar = async (e: React.FormEvent) => {
+  const recuperarSenha = async (e: React.FormEvent) => {
     e.preventDefault();
-    setEnviando(true);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password: senha,
-      options: {
-        emailRedirectTo: `${window.location.origin}/escalas`,
-        data: { nome },
-      },
+    setEnviandoRecuperacao(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(emailRecuperacao, {
+      redirectTo: `${window.location.origin}/auth`,
     });
-    setEnviando(false);
+    setEnviandoRecuperacao(false);
     if (error) {
-      toast.error(
-        error.message.includes("already registered")
-          ? "Este e-mail já está cadastrado."
-          : error.message,
-      );
+      toast.error("Não foi possível enviar o e-mail. Verifique o endereço informado.");
       return;
     }
-    toast.success("Conta criada! Verifique seu e-mail se a confirmação for solicitada.");
+    toast.success("E-mail de recuperação enviado! Verifique sua caixa de entrada.");
+    setMostraRecuperacao(false);
+    setEmailRecuperacao("");
   };
-
 
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
@@ -107,14 +100,42 @@ function AuthPage() {
             <span className="font-semibold">BETAXLOG</span>
           </div>
 
-          <Tabs defaultValue="entrar">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="entrar">Entrar</TabsTrigger>
-              <TabsTrigger value="criar">Criar conta</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="entrar">
-              <form onSubmit={entrar} className="mt-6 space-y-4">
+          {mostraRecuperacao ? (
+            <div>
+              <h2 className="mb-1 text-xl font-semibold">Recuperar senha</h2>
+              <p className="mb-6 text-sm text-muted-foreground">
+                Informe seu e-mail e enviaremos um link para redefinir sua senha.
+              </p>
+              <form onSubmit={recuperarSenha} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email-recuperacao">E-mail</Label>
+                  <Input
+                    id="email-recuperacao"
+                    type="email"
+                    required
+                    autoComplete="email"
+                    value={emailRecuperacao}
+                    onChange={(e) => setEmailRecuperacao(e.target.value)}
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={enviandoRecuperacao}>
+                  {enviandoRecuperacao && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Enviar link de recuperação
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setMostraRecuperacao(false)}
+                >
+                  Voltar para o login
+                </Button>
+              </form>
+            </div>
+          ) : (
+            <div>
+              <h2 className="mb-6 text-xl font-semibold">Entrar no sistema</h2>
+              <form onSubmit={entrar} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">E-mail</Label>
                   <Input
@@ -141,53 +162,19 @@ function AuthPage() {
                   {enviando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Entrar
                 </Button>
+                <button
+                  type="button"
+                  onClick={() => setMostraRecuperacao(true)}
+                  className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
+                >
+                  Esqueci minha senha
+                </button>
               </form>
-            </TabsContent>
+            </div>
+          )}
 
-            <TabsContent value="criar">
-              <form onSubmit={cadastrar} className="mt-6 space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="nome">Nome</Label>
-                  <Input
-                    id="nome"
-                    required
-                    value={nome}
-                    onChange={(e) => setNome(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email-novo">E-mail</Label>
-                  <Input
-                    id="email-novo"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="senha-nova">Senha</Label>
-                  <Input
-                    id="senha-nova"
-                    type="password"
-                    required
-                    minLength={6}
-                    autoComplete="new-password"
-                    value={senha}
-                    onChange={(e) => setSenha(e.target.value)}
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={enviando}>
-                  {enviando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Criar conta
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
-
-          <p className="mt-6 text-center text-xs text-muted-foreground">
-            O primeiro cadastro da operação recebe acesso de administrador. Depois disso,
-            novos acessos são criados pelo administrador na aba Equipe.
+          <p className="mt-8 text-center text-xs text-muted-foreground">
+            Acesso restrito à equipe autorizada. Novos acessos são criados pelo administrador.
           </p>
         </div>
       </section>
