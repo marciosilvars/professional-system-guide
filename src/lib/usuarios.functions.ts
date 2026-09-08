@@ -130,7 +130,7 @@ export const editarUsuario = createServerFn({ method: "POST" })
     });
     if (erroAuth) {
       if (erroAuth.message.includes("already")) throw new Error("Este usuário/e-mail já está em uso.");
-      throw new Error("Não foi possível atualizar as credenciais do usuário.");
+      throw new Error(`Erro Auth: ${erroAuth.message}`);
     }
 
     await supabaseAdmin
