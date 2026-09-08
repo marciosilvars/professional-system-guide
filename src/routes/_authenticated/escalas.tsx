@@ -14,7 +14,7 @@ import {
   Star,
 } from "lucide-react";
 import { toast } from "sonner";
-import html2canvas from "html2canvas";
+import { toPng } from "html-to-image";
 import { supabase } from "@/integrations/supabase/client";
 import { registrarAuditoria } from "@/lib/auditoria";
 import {
@@ -361,11 +361,12 @@ function EscalasPage() {
       alvo.style.opacity = "1";
       alvo.style.zIndex = "99999";
 
-      const canvas = await html2canvas(alvo, {
+      // Aguarda um pequeno instante para o navegador atualizar o layout (reflow)
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      const dataUrl = await toPng(alvo, {
         backgroundColor: "#ffffff",
-        scale: 2,
-        useCORS: true,
-        logging: true, // Enable logging to see what fails
+        pixelRatio: window.devicePixelRatio || 2, // Alta qualidade
       });
 
       // Restaura para oculto
@@ -376,7 +377,7 @@ function EscalasPage() {
 
       const link = document.createElement("a");
       link.download = `escala-betaxlog-${data}.png`;
-      link.href = canvas.toDataURL("image/png");
+      link.href = dataUrl;
       link.click();
       toast.success("Imagem gerada e baixada com sucesso!");
     } catch (erro) {
