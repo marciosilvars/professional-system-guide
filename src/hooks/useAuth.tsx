@@ -34,9 +34,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(nextSession);
         setRecoveryMode(true);
         setLoading(false);
-        // Redireciona para a tela de nova senha independente de qual página estiver aberta
+        // Redireciona para a tela de nova senha independente de qual página estiver aberta.
+        // Preserva o hash (#access_token=...) para que o token não se perca na navegação.
         if (typeof window !== "undefined" && window.location.pathname !== "/reset-password") {
-          window.location.replace("/reset-password");
+          const hash = window.location.hash || "";
+          window.location.replace("/reset-password" + hash);
         }
         return;
       }

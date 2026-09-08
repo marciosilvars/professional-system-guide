@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { KeyRound, Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,19 +21,21 @@ export const Route = createFileRoute("/reset-password")({
 
 function ResetPasswordPage() {
   const navigate = useNavigate();
+  const { recoveryMode } = useAuth();
   const [novaSenha, setNovaSenha] = useState("");
   const [confirmar, setConfirmar] = useState("");
   const [salvando, setSalvando] = useState(false);
-  const [pronto, setPronto] = useState(false); // true após PASSWORD_RECOVERY ser detectado
+  const [pronto, setPronto] = useState(false);
 
-  /**
-   * Quando o usuário clica no link do e-mail, o Supabase redireciona para
-   * /reset-password com o token no hash da URL (#access_token=...&type=recovery).
-   * O SDK processa esse hash automaticamente e emite o evento PASSWORD_RECOVERY.
-   * Aguardamos esse evento para saber que a sessão de recovery foi estabelecida.
-   */
   useEffect(() => {
-    // Tenta resolver a sessão do hash da URL (necessário em alguns navegadores)
+    // Se o AuthProvider já detectou PASSWORD_RECOVERY antes desta página carregar,
+    // exibimos o formulário imediatamente sem esperar o evento disparar de novo.
+    if (recoveryMode) {
+      setPronto(true);
+      return;
+    }
+
+    // Garante que a sessão do hash seja processada pelo SDK
     void supabase.auth.getSession();
 
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
@@ -41,7 +44,7 @@ function ResetPasswordPage() {
       }
     });
 
-    // Timeout de segurança: se o evento não chegar em 3s, exibe erro
+    // Timeout de segurança: se nenhum sinal chegar em 4s, o link é inválido/expirado
     const timeout = setTimeout(() => {
       setPronto((atual) => {
         if (!atual) {
@@ -52,13 +55,13 @@ function ResetPasswordPage() {
         }
         return atual;
       });
-    }, 3000);
+    }, 4000);
 
     return () => {
       sub.subscription.unsubscribe();
       clearTimeout(timeout);
     };
-  }, [navigate]);
+  }, [navigate, recoveryMode]);
 
   const salvar = async (e: React.FormEvent) => {
     e.preventDefault();
