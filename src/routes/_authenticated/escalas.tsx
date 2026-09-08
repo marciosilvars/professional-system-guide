@@ -11,6 +11,7 @@ import {
   FileSpreadsheet,
   Search,
   Loader2,
+  Star,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +23,7 @@ import {
   formatarDataBR,
   gerarItensEscala,
   hojeISO,
+  normalizarHorario,
   textoWhatsApp,
   type Escala,
   type EscalaItem,
@@ -42,20 +44,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/escalas")({
   head: () => ({
     meta: [
-      { title: "Escala do dia — BETAXLOG" }, // Corrigido: "Escala do dia â€” BETAXLOG"
+      { title: "Escala do dia — BETAXLOG" },
       {
         name: "description",
         content:
-          "Monte a escala diária de motoristas com rodízio automático, ondas de carregamento e compartilhamento rápido.", // Corrigido: "Monte a escala diĂˇria de motoristas com rodĂ­zio automĂˇtico, ondas de carregamento e compartilhamento rĂˇpido."
+          "Monte a escala diária de motoristas com rodízio automático, ondas de carregamento e compartilhamento rápido.",
       },
-      { property: "og:title", content: "Escala do dia — BETAXLOG" }, // Corrigido: "Escala do dia â€” BETAXLOG"
+      { property: "og:title", content: "Escala do dia — BETAXLOG" },
       {
         property: "og:description",
-        content: "Rodízio automático de motoristas por tipo de veículo e onda de carregamento.", // Corrigido: "RodĂ­zio automĂˇtico de motoristas por tipo de veĂ­culo e onda de carregamento."
+        content: "Rodízio automático de motoristas por tipo de veículo e onda de carregamento.",
       },
       { name: "robots", content: "noindex" },
     ],
@@ -63,10 +73,14 @@ export const Route = createFileRoute("/_authenticated/escalas")({
   component: EscalasPage,
 });
 
+// Número do grupo de WhatsApp para envio
+const WHATSAPP_GRUPO = ""; // Preencha com o número do grupo se disponível
+
 function EscalasPage() {
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const capturaRef = useRef<HTMLDivElement>(null);
+  const imagemRef = useRef<HTMLDivElement>(null);
 
   const [data, setData] = useState(hojeISO());
   const [vagas, setVagas] = useState({ utilitario: 0, van: 0, passeio: 0 });
@@ -74,6 +88,7 @@ function EscalasPage() {
   const [indisponiveis, setIndisponiveis] = useState<Set<string>>(new Set());
   const [busca, setBusca] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const [dialogoWhatsApp, setDialogoWhatsApp] = useState(false);
 
   const motoristasQuery = useQuery({
     queryKey: ["motoristas"],
@@ -133,11 +148,13 @@ function EscalasPage() {
         dsp: i.dsp,
         veiculo: i.veiculo,
         onda: i.onda,
+        horario: (i as any).horario ?? "",
         ordem: i.ordem,
         status: i.status as StatusItem,
+        prioritario: !!(motoristasQuery.data?.find((m) => m.id === i.motorista_id)?.prioritario),
       })),
     );
-  }, [escalaQuery.data, escala, itensSalvos]);
+  }, [escalaQuery.data, escala, itensSalvos, motoristasQuery.data]);
 
   const totalVagas = vagas.utilitario + vagas.van + vagas.passeio;
 
@@ -182,9 +199,38 @@ function EscalasPage() {
       if (error) throw error;
 
       await supabase.from("escala_itens").delete().eq("escala_id", escalaSalva.id);
-      const { error: erroItens } = await supabase.from("escala_itens").insert(
-        itens.map((i, idx) => ({ ...i, ordem: idx, escala_id: escalaSalva.id })),
-      );
+      
+      const payloadComHorario = itens.map((i, idx) => ({
+        motorista_id: i.motorista_id,
+        motorista_nome: i.motorista_nome,
+        telefone: i.telefone,
+        dsp: i.dsp || DSP_PADRAO,
+        veiculo: i.veiculo,
+        onda: i.onda,
+        horario: i.horario,
+        ordem: idx,
+        status: i.status,
+        escala_id: escalaSalva.id,
+      }));
+
+      let { error: erroItens } = await supabase.from("escala_itens").insert(payloadComHorario as any);
+      
+      // Fallback gracioso: caso a coluna horario ainda não tenha sido sincronizada no banco remoto
+      if (erroItens && (erroItens.message?.includes("horario") || erroItens.message?.includes("column"))) {
+        const payloadSemHorario = itens.map((i, idx) => ({
+          motorista_id: i.motorista_id,
+          motorista_nome: i.motorista_nome,
+          telefone: i.telefone,
+          dsp: i.dsp || DSP_PADRAO,
+          veiculo: i.veiculo,
+          onda: i.onda || i.horario || "",
+          ordem: idx,
+          status: i.status,
+          escala_id: escalaSalva.id,
+        }));
+        const retry = await supabase.from("escala_itens").insert(payloadSemHorario);
+        erroItens = retry.error;
+      }
       if (erroItens) throw erroItens;
 
       if (status === "definitiva") {
@@ -238,7 +284,7 @@ function EscalasPage() {
 
   const trocarMotorista = (idx: number, motoristaId: string) => {
     if (motoristaId === "vago") {
-      atualizarItem(idx, { motorista_id: null, motorista_nome: VAGA_LIVRE, telefone: "" });
+      atualizarItem(idx, { motorista_id: null, motorista_nome: VAGA_LIVRE, telefone: "", prioritario: false });
       return;
     }
     const m = motoristas.find((x) => x.id === motoristaId);
@@ -248,28 +294,100 @@ function EscalasPage() {
       motorista_nome: m.nome,
       telefone: m.telefone,
       veiculo: m.tipo_veiculo,
+      prioritario: !!m.prioritario,
     });
   };
 
-  const copiarWhatsApp = async () => {
-    const texto = textoWhatsApp(data, itens);
-    try {
-      await navigator.clipboard.writeText(texto);
-      toast.success("Texto copiado para o WhatsApp.");
-    } catch {
-      window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank", "noopener");
+  // Avança para o próximo campo de horário ao pressionar Enter e normaliza o valor
+  const handleHorarioKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const raw = (e.target as HTMLInputElement).value;
+      const res = normalizarHorario(raw);
+      if (res.valido && res.valor) {
+        atualizarItem(idx, { horario: res.valor });
+      }
+      const next = document.getElementById(`horario-${idx + 1}`);
+      if (next) {
+        (next as HTMLInputElement).focus();
+        (next as HTMLInputElement).select?.();
+      }
     }
   };
 
+  const handleHorarioBlur = (val: string, idx: number) => {
+    if (!val.trim()) return;
+    const res = normalizarHorario(val);
+    if (res.valido && res.valor) {
+      atualizarItem(idx, { horario: res.valor });
+    }
+  };
+
+  const abrirWhatsApp = async () => {
+    const confirmados = itens.filter(
+      (i) => i.status === "confirmado" && i.motorista_id && i.motorista_nome !== VAGA_LIVRE,
+    );
+    if (confirmados.length === 0) {
+      toast.warning("Aviso: Nenhum motorista com situação 'Confirmado' na escala.");
+    }
+
+    const texto = textoWhatsApp(data, itens);
+
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(texto);
+        toast.success("Texto da escala copiado para a área de transferência!");
+      }
+    } catch {
+      // Ignora erro de clipboard se bloqueado pelo navegador
+    }
+
+    // Abre a API do WhatsApp com o texto pré-carregado (permite escolher o grupo de destino)
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+    setDialogoWhatsApp(false);
+  };
+
   const gerarImagem = async () => {
-    if (!capturaRef.current) return;
-    const html2canvas = (await import("html2canvas")).default;
-    const canvas = await html2canvas(capturaRef.current, { backgroundColor: "#ffffff", scale: 2 });
-    const link = document.createElement("a");
-    link.download = `escala-betaxlog-${data}.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
-    toast.success("Imagem gerada.");
+    const alvo = imagemRef.current;
+    if (!alvo) return;
+    try {
+      toast.info("Gerando imagem da escala...");
+      const html2canvas = (await import("html2canvas")).default;
+
+      // Move temporariamente para posição visível controlada no topo para captura fiel
+      alvo.style.left = "0px";
+      alvo.style.top = "0px";
+      alvo.style.opacity = "1";
+      alvo.style.zIndex = "99999";
+
+      const canvas = await html2canvas(alvo, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+
+      // Restaura para oculto
+      alvo.style.left = "-9999px";
+      alvo.style.top = "0px";
+      alvo.style.opacity = "0";
+      alvo.style.zIndex = "-100";
+
+      const link = document.createElement("a");
+      link.download = `escala-betaxlog-${data}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+      toast.success("Imagem gerada e baixada com sucesso!");
+    } catch {
+      if (alvo) {
+        alvo.style.left = "-9999px";
+        alvo.style.top = "0px";
+        alvo.style.opacity = "0";
+        alvo.style.zIndex = "-100";
+      }
+      toast.error("Não foi possível gerar a imagem da escala.");
+    }
   };
 
   const exportarExcel = async () => {
@@ -281,6 +399,7 @@ function EscalasPage() {
       Telefone: i.telefone,
       Veículo: i.veiculo,
       Onda: i.onda,
+      Horário: i.horario,
       Situação: STATUS_ITEM_LABEL[i.status],
     }));
     const wb = XLSX.utils.book_new();
@@ -312,7 +431,7 @@ function EscalasPage() {
         </div>
         {escala && (
           <Badge variant={definitiva ? "default" : "secondary"}>
-            {definitiva ? "DEFINITIVA" : "PRÉVIA SALVA"} {/* Corrigido: "PRĂ‰VIA SALVA" */}
+            {definitiva ? "DEFINITIVA" : "PRÉVIA SALVA"}
           </Badge>
         )}
       </header>
@@ -381,44 +500,42 @@ function EscalasPage() {
 
       {itens.length > 0 && (
         <section className="surface-panel p-6">
-          <h2 className="mb-4 text-lg font-semibold">2. Escala gerada</h2>
+          <h2 className="mb-4 text-lg font-semibold">2. Escala Gerada</h2>
 
-          <div ref={capturaRef} className="rounded-lg border border-border bg-card p-4">
-            <div className="mb-4 border-b border-border pb-3">
-              <p className="text-lg font-bold text-primary">BETAXLOG</p>
-              <p className="text-sm text-muted-foreground">Data: {formatarDataBR(data)}</p>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <th className="py-2 pr-3">DSP</th>
-                    <th className="py-2 pr-3">Motorista</th>
-                    <th className="py-2 pr-3">Veículo</th>
-                    <th className="py-2 pr-3">Onda</th>
-                    <th className="py-2 pr-3">Situação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {itens.map((item, idx) => (
-                    <tr
-                      key={idx}
-                      className={
-                        item.status === "cancelado"
-                          ? "border-b border-border/60 text-muted-foreground line-through"
-                          : "border-b border-border/60"
-                      }
-                    >
-                      <td className="py-2 pr-3">
-                        <Input
-                          className="h-8 w-28"
-                          value={item.dsp}
-                          placeholder={DSP_PADRAO}
-                          onChange={(e) => atualizarItem(idx, { dsp: e.target.value })}
-                        />
-                      </td>
-                      <td className="py-2 pr-3 min-w-52">
+          {/* Tabela para operadores — com marcação de prioritário */}
+          <div ref={capturaRef} className="overflow-x-auto rounded-lg border border-border bg-card p-4">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="py-2 pr-3">DSP</th>
+                  <th className="py-2 pr-3">Motorista</th>
+                  <th className="py-2 pr-3">Veículo</th>
+                  <th className="py-2 pr-3">Onda</th>
+                  <th className="py-2 pr-3">Horário</th>
+                  <th className="py-2 pr-3">Situação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {itens.map((item, idx) => (
+                  <tr
+                    key={idx}
+                    className={
+                      item.status === "cancelado" || item.status === "falta"
+                        ? "border-b border-border/60 text-muted-foreground line-through"
+                        : "border-b border-border/60"
+                    }
+                  >
+                    {/* DSP fixo — apenas leitura */}
+                    <td className="py-2 pr-3">
+                      <div className="flex h-8 w-28 items-center rounded-md border border-border bg-muted px-2 text-sm font-medium">
+                        {DSP_PADRAO}
+                      </div>
+                    </td>
+                    <td className="py-2 pr-3 min-w-52">
+                      <div className="flex items-center gap-1">
+                        {item.prioritario && (
+                          <Star className="h-3.5 w-3.5 flex-shrink-0 fill-amber-400 text-amber-400" title="Prioritário" />
+                        )}
                         <Select
                           value={item.motorista_id ?? "vago"}
                           onValueChange={(v) => trocarMotorista(idx, v)}
@@ -431,57 +548,155 @@ function EscalasPage() {
                             <SelectItem value="vago">Vaga livre</SelectItem>
                             {motoristas.map((m) => (
                               <SelectItem key={m.id} value={m.id}>
-                                {m.nome}
+                                {m.nome}{m.prioritario ? " ⭐" : ""}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
-                      </td>
-                      <td className="py-2 pr-3">
-                        <Input
-                          className="h-8 w-28"
-                          value={item.veiculo}
-                          onChange={(e) => atualizarItem(idx, { veiculo: e.target.value })}
-                          disabled={definitiva}
-                        />
-                      </td>
-                      <td className="py-2 pr-3">
-                        <Input
-                          className="h-8 w-20"
-                          type="number"
-                          min={0}
-                          value={item.onda}
-                          onChange={(e) => atualizarItem(idx, { onda: e.target.value })}
-                          disabled={definitiva}
-                        />
-                      </td>
-                      <td className="py-2 pr-3">
-                        <Select
-                          value={item.status}
-                          onValueChange={(v) => atualizarItem(idx, { status: v as StatusItem })}
-                          disabled={definitiva}
-                        >
-                          <SelectTrigger className="h-8 w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(STATUS_ITEM_LABEL).map(([key, value]) => (
-                              <SelectItem key={key} value={key}>
-                                {value}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </td>
+                    {/* Veículo — somente leitura */}
+                    <td className="py-2 pr-3">
+                      <div className="flex h-8 w-32 items-center rounded-md border border-border bg-muted px-2 text-sm">
+                        {item.veiculo || "—"}
+                      </div>
+                    </td>
+                    <td className="py-2 pr-3">
+                      <Input
+                        className="h-8 w-20"
+                        type="number"
+                        min={0}
+                        value={item.onda}
+                        onChange={(e) => atualizarItem(idx, { onda: e.target.value })}
+                        disabled={definitiva}
+                      />
+                    </td>
+                    <td className="py-2 pr-3">
+                      <Input
+                        id={`horario-${idx}`}
+                        className="h-8 w-24 font-mono text-center"
+                        placeholder="hh:mm"
+                        value={item.horario ?? ""}
+                        onChange={(e) => {
+                          // Permite digitação contínua e aplica formatação automática hh:mm
+                          let v = e.target.value.replace(/[^\d:]/g, "").slice(0, 5);
+                          if (!v.includes(":") && v.length >= 3) {
+                            v = v.slice(0, 2) + ":" + v.slice(2, 4);
+                          }
+                          atualizarItem(idx, { horario: v });
+                        }}
+                        onBlur={(e) => handleHorarioBlur(e.target.value, idx)}
+                        onKeyDown={(e) => handleHorarioKeyDown(e, idx)}
+                        disabled={definitiva}
+                      />
+                    </td>
+                    <td className="py-2 pr-3">
+                      <Select
+                        value={item.status}
+                        onValueChange={(v) => atualizarItem(idx, { status: v as StatusItem })}
+                        disabled={definitiva}
+                      >
+                        <SelectTrigger className="h-8 w-36">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="escalado">Escalado</SelectItem>
+                          <SelectItem value="confirmado">Confirmado</SelectItem>
+                          <SelectItem value="concluido">Concluído</SelectItem>
+                          <SelectItem value="cancelado">Cancelado</SelectItem>
+                          <SelectItem value="falta">Falta</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Versão limpa para captura de imagem — SEM marcações de prioritário (apenas operador vê) */}
+          <div
+            ref={imagemRef}
+            style={{
+              position: "fixed",
+              left: "-9999px",
+              top: 0,
+              width: "920px",
+              zIndex: -100,
+              opacity: 0,
+              backgroundColor: "#ffffff",
+            }}
+            className="p-8 text-slate-900 font-sans"
+            aria-hidden="true"
+          >
+            <div className="mb-6 flex items-center justify-between border-b-2 border-blue-600 pb-4">
+              <div>
+                <h1 className="text-2xl font-black tracking-wider text-blue-700">BETAXLOG</h1>
+                <p className="text-sm font-semibold uppercase text-slate-600">
+                  Escala de Carregamento — {formatarDataBR(data)}
+                </p>
+              </div>
+              <div className="text-right text-xs text-slate-500">
+                <p className="font-semibold text-slate-700">DSP BETAXLOG</p>
+                <p>Total de rotas: {itens.filter((i) => i.status !== "cancelado").length}</p>
+              </div>
+            </div>
+
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b-2 border-slate-300 bg-slate-100 text-left text-xs font-bold uppercase tracking-wider text-slate-700">
+                  <th className="py-2.5 px-3 text-center">#</th>
+                  <th className="py-2.5 px-3">DSP</th>
+                  <th className="py-2.5 px-3">Motorista</th>
+                  <th className="py-2.5 px-3">Veículo</th>
+                  <th className="py-2.5 px-3 text-center">Onda</th>
+                  <th className="py-2.5 px-3 text-center">Horário</th>
+                  <th className="py-2.5 px-3 text-center">Situação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {itens.map((item, idx) => (
+                  <tr
+                    key={idx}
+                    className={`border-b border-slate-200 ${
+                      idx % 2 === 0 ? "bg-white" : "bg-slate-50/70"
+                    } ${item.status === "cancelado" ? "text-slate-400 line-through" : ""}`}
+                  >
+                    <td className="py-2 px-3 text-center font-semibold text-slate-400">{idx + 1}</td>
+                    <td className="py-2 px-3 font-bold text-slate-800">{DSP_PADRAO}</td>
+                    <td className="py-2 px-3 font-medium text-slate-900">{item.motorista_nome}</td>
+                    <td className="py-2 px-3 text-slate-700">{item.veiculo}</td>
+                    <td className="py-2 px-3 text-center text-slate-700">{item.onda || "—"}</td>
+                    <td className="py-2 px-3 text-center font-mono font-semibold text-slate-800">{item.horario || "—"}</td>
+                    <td className="py-2 px-3 text-center">
+                      <span
+                        className={`inline-block rounded px-2.5 py-0.5 text-xs font-semibold ${
+                          item.status === "confirmado"
+                            ? "bg-green-100 text-green-800"
+                            : item.status === "concluido"
+                            ? "bg-blue-100 text-blue-800"
+                            : item.status === "falta"
+                            ? "bg-red-100 text-red-800"
+                            : item.status === "cancelado"
+                            ? "bg-gray-100 text-gray-600"
+                            : "bg-amber-100 text-amber-800"
+                        }`}
+                      >
+                        {STATUS_ITEM_LABEL[item.status]}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="mt-6 border-t border-slate-200 pt-3 text-center text-xs text-slate-400">
+              BETAXLOG Transportes e Logística · Escala sujeita a alterações operacionais
             </div>
           </div>
 
           <div className="mt-5 flex flex-wrap gap-3">
-            <Button variant="outline" onClick={() => void copiarWhatsApp()}>
+            <Button variant="outline" onClick={() => setDialogoWhatsApp(true)}>
               <MessageSquareText className="mr-2 h-4 w-4" /> Copiar para WhatsApp
             </Button>
             <Button variant="outline" onClick={() => void gerarImagem()}>
@@ -493,6 +708,31 @@ function EscalasPage() {
           </div>
         </section>
       )}
+
+      {/* Dialog confirmação WhatsApp */}
+      <Dialog open={dialogoWhatsApp} onOpenChange={setDialogoWhatsApp}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enviar Escala para o WhatsApp</DialogTitle>
+            <DialogDescription className="space-y-2 pt-2">
+              <p>
+                Você deseja abrir o WhatsApp para enviar a escala para o grupo?
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Será enviada a listagem das rotas e a <strong>marcação (@telefone)</strong> apenas dos motoristas com situação <strong>Confirmado</strong> (ex: @51989286869). O texto também será copiado para sua área de transferência.
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 sm:justify-end">
+            <Button variant="outline" onClick={() => setDialogoWhatsApp(false)}>
+              Não
+            </Button>
+            <Button onClick={() => void abrirWhatsApp()}>
+              Sim, abrir WhatsApp
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <section className="surface-panel p-6">
         <h2 className="mb-4 text-lg font-semibold">3. Motoristas indisponíveis</h2>
@@ -526,6 +766,7 @@ function EscalasPage() {
                     />
                     <Label htmlFor={`indisponivel-${m.id}`} className="font-normal">
                       {m.nome}
+                      {m.prioritario && <span className="ml-1 text-amber-400">⭐</span>}
                     </Label>
                   </div>
                 ))}

@@ -1,0 +1,1 @@
+ALTER TABLE public.escala_itens ADD COLUMN IF NOT EXISTS horario TEXT NOT NULL DEFAULT '';

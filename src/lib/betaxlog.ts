@@ -11,12 +11,14 @@ export type TipoVeiculo = (typeof TIPOS_VEICULO)[number];
 export const DSP_PADRAO = "BETAXLOG";
 export const VAGA_LIVRE = "VAGA DISPONÍVEL / SOBRESSALENTE";
 
-export type StatusItem = "escalado" | "concluido" | "cancelado";
+export type StatusItem = "escalado" | "confirmado" | "concluido" | "cancelado" | "falta";
 
 export const STATUS_ITEM_LABEL: Record<StatusItem, string> = {
   escalado: "Escalado",
+  confirmado: "Confirmado",
   concluido: "Concluído",
   cancelado: "Cancelado",
+  falta: "Falta",
 };
 
 export interface NovoItem {
@@ -26,8 +28,10 @@ export interface NovoItem {
   dsp: string;
   veiculo: string;
   onda: string;
+  horario: string;
   ordem: number;
   status: StatusItem;
+  prioritario?: boolean;
 }
 
 export interface GerarEscalaParams {
@@ -38,10 +42,59 @@ export interface GerarEscalaParams {
 }
 
 /**
- * Rodízio justo: dentro de cada tipo de veículo, os motoristas disponíveis são
- * ordenados pela data da última escala (quem está há mais tempo sem escalar vem
- * primeiro) e, como desempate, pelo nome. Motoristas prioritários ficam fora do
- * rodízio automático e só entram por atribuição manual, que é preservada.
+ * Normaliza e valida horários digitados (ex: 7 → 07:00, 730 → 07:30, 1830 → 18:30).
+ * Intervalo válido: 00:00 até 23:59.
+ */
+export function normalizarHorario(entrada: string): { valido: boolean; valor: string } {
+  if (!entrada || !entrada.trim()) return { valido: true, valor: "" };
+  const limpo = entrada.trim();
+
+  let horas = -1;
+  let minutos = -1;
+
+  if (limpo.includes(":")) {
+    const partes = limpo.split(":");
+    if (partes.length === 2) {
+      horas = parseInt(partes[0], 10);
+      minutos = parseInt(partes[1], 10);
+    }
+  } else {
+    const digitos = limpo.replace(/\D/g, "");
+    if (digitos.length === 1 || digitos.length === 2) {
+      horas = parseInt(digitos, 10);
+      minutos = 0;
+    } else if (digitos.length === 3) {
+      horas = parseInt(digitos.slice(0, 1), 10);
+      minutos = parseInt(digitos.slice(1, 3), 10);
+    } else if (digitos.length === 4) {
+      horas = parseInt(digitos.slice(0, 2), 10);
+      minutos = parseInt(digitos.slice(2, 4), 10);
+    }
+  }
+
+  if (
+    isNaN(horas) ||
+    isNaN(minutos) ||
+    horas < 0 ||
+    horas > 23 ||
+    minutos < 0 ||
+    minutos > 59
+  ) {
+    return { valido: false, valor: entrada };
+  }
+
+  const hh = String(horas).padStart(2, "0");
+  const mm = String(minutos).padStart(2, "0");
+  return { valido: true, valor: `${hh}:${mm}` };
+}
+
+/**
+ * Rodízio justo:
+ * 1. Motoristas prioritários NÃO entram no rodízio de datas (não competem na fila de última escala).
+ *    Quando disponíveis (não marcados como indisponíveis), são alocados prioritariamente nas vagas
+ *    do seu veículo.
+ * 2. As vagas restantes são preenchidas pelo rodízio dos motoristas normais (ordenados pela
+ *    data da última escala - quem está há mais tempo sem escalar vem primeiro).
  */
 export function gerarItensEscala({
   motoristas,
@@ -54,12 +107,13 @@ export function gerarItensEscala({
     motoristas.filter((m) => m.prioritario).map((m) => [m.id, m]),
   );
 
-  const disponiveis = motoristas.filter(
+  // Fila de rodízio: APENAS motoristas não prioritários
+  const disponiveisRodizio = motoristas.filter(
     (m) => m.ativo && !m.prioritario && !indisponiveis.has(m.id),
   );
 
-  const fila = (tipo: TipoVeiculo) =>
-    disponiveis
+  const filaRodizio = (tipo: TipoVeiculo) =>
+    disponiveisRodizio
       .filter((m) => m.tipo_veiculo === tipo)
       .sort((a, b) => {
         const da = a.ultima_escala ?? "";
@@ -69,24 +123,33 @@ export function gerarItensEscala({
       });
 
   const filas: Record<TipoVeiculo, Motorista[]> = {
-    Utilitário: fila("Utilitário"),
-    Van: fila("Van"),
-    "Carro de Passeio": fila("Carro de Passeio"),
+    Utilitário: filaRodizio("Utilitário"),
+    Van: filaRodizio("Van"),
+    "Carro de Passeio": filaRodizio("Carro de Passeio"),
   };
+
+  // Prioritários disponíveis por tipo de veículo (não entram na fila de rodízio)
+  const prioritariosDisponiveis = (tipo: TipoVeiculo) =>
+    motoristas.filter(
+      (m) => m.ativo && m.prioritario && !indisponiveis.has(m.id) && m.tipo_veiculo === tipo,
+    );
 
   const usados = new Set<string>();
   const itens: NovoItem[] = [];
 
   const processar = (tipo: TipoVeiculo, quantidade: number) => {
-    let cursor = 0;
+    let cursorRodizio = 0;
+    const listaPrioritarios = prioritariosDisponiveis(tipo);
+    let cursorPrioritario = 0;
+
     for (let i = 0; i < quantidade; i++) {
       const ordem = itens.length;
       const anterior = porOrdem[ordem];
 
-      // Preserva atribuição manual de motorista prioritário ainda disponível.
+      // 1. Preserva atribuição anterior caso já seja um prioritário disponível
       if (anterior?.motorista_id) {
         const prioritario = prioritariosPorId.get(anterior.motorista_id);
-        if (prioritario && !indisponiveis.has(prioritario.id) && prioritario.ativo) {
+        if (prioritario && !indisponiveis.has(prioritario.id) && prioritario.ativo && !usados.has(prioritario.id)) {
           usados.add(prioritario.id);
           itens.push({
             motorista_id: prioritario.id,
@@ -95,33 +158,55 @@ export function gerarItensEscala({
             dsp: anterior.dsp || DSP_PADRAO,
             veiculo: prioritario.tipo_veiculo,
             onda: anterior.onda,
+            horario: (anterior as any).horario ?? "",
             ordem,
             status: (anterior.status as StatusItem) ?? "escalado",
+            prioritario: true,
           });
           continue;
         }
       }
 
+      // 2. Se houver motoristas prioritários disponíveis do tipo que ainda não foram usados, aloca-os primeiro
       let escolhido: Motorista | undefined;
-      while (cursor < filas[tipo].length && !escolhido) {
-        const candidato = filas[tipo][cursor++];
-        if (candidato && !usados.has(candidato.id)) escolhido = candidato;
+      let ehPrioritario = false;
+
+      while (cursorPrioritario < listaPrioritarios.length && !escolhido) {
+        const cand = listaPrioritarios[cursorPrioritario++];
+        if (cand && !usados.has(cand.id)) {
+          escolhido = cand;
+          ehPrioritario = true;
+        }
+      }
+
+      // 3. Se não houver mais prioritários, pega da fila de rodízio normal
+      if (!escolhido) {
+        while (cursorRodizio < filas[tipo].length && !escolhido) {
+          const cand = filas[tipo][cursorRodizio++];
+          if (cand && !usados.has(cand.id)) {
+            escolhido = cand;
+            ehPrioritario = false;
+          }
+        }
       }
 
       if (escolhido) {
         usados.add(escolhido.id);
-        const historico = porOrdem.find((it) => it.motorista_id === escolhido.id);
+        const historico = porOrdem.find((it) => it.motorista_id === escolhido!.id);
         itens.push({
           motorista_id: escolhido.id,
           motorista_nome: escolhido.nome,
           telefone: escolhido.telefone,
           dsp: historico?.dsp || DSP_PADRAO,
           veiculo: escolhido.tipo_veiculo,
-          onda: historico?.onda ?? "",
+          onda: historico?.onda ?? anterior?.onda ?? "",
+          horario: (historico as any)?.horario ?? (anterior as any)?.horario ?? "",
           ordem,
           status: (historico?.status as StatusItem) ?? "escalado",
+          prioritario: ehPrioritario,
         });
       } else {
+        // Vaga sobressalente / livre
         itens.push({
           motorista_id: null,
           motorista_nome: VAGA_LIVRE,
@@ -129,8 +214,10 @@ export function gerarItensEscala({
           dsp: DSP_PADRAO,
           veiculo: tipo,
           onda: anterior?.onda ?? "",
+          horario: (anterior as any)?.horario ?? "",
           ordem,
           status: "escalado",
+          prioritario: false,
         });
       }
     }
@@ -193,26 +280,48 @@ export interface LinhaCompartilhavel {
   telefone?: string;
   veiculo: string;
   onda: string;
+  horario?: string;
   status: string;
 }
 
-export function textoWhatsApp(data: string, itens: LinhaCompartilhavel[]): string {
-  const ativos = itens.filter((i) => i.status !== "cancelado");
-  const linhas = ativos.map(
-    (i, idx) =>
-      `${idx + 1}. ${i.motorista_nome} — ${i.veiculo}${i.onda ? ` — Onda ${i.onda}` : ""}`,
+/**
+ * Gera mensagem formatada para envio ao grupo do WhatsApp.
+ * - Lista todas as rotas ativas (não canceladas).
+ * - Ao final, insere a marcação (@telefone) APENAS dos motoristas com situação 'Confirmado',
+ *   exemplo: @51989286869.
+ */
+export function textoWhatsApp(data: string, itens: (NovoItem | LinhaCompartilhavel)[]): string {
+  const confirmados = itens.filter(
+    (i) => i.status === "confirmado" && i.motorista_nome !== VAGA_LIVRE,
   );
-  const mencoes = ativos
+  const ativos = itens.filter((i) => i.status !== "cancelado");
+
+  const linhas = ativos.map((i, idx) => {
+    const statusIcon = i.status === "confirmado" ? "✅ " : i.status === "falta" ? "❌ [FALTA] " : "";
+    const ondaStr = i.onda ? ` — Onda ${i.onda}` : "";
+    const horarioStr = i.horario ? ` — ${i.horario}` : "";
+    return `${idx + 1}. ${statusIcon}*${i.motorista_nome}* — ${i.veiculo}${ondaStr}${horarioStr}`;
+  });
+
+  // Marcações (@telefone) exclusivamente dos motoristas com situação 'Confirmado'
+  const mencoes = confirmados
     .map((i) => (i.telefone ?? "").replace(/\D/g, ""))
     .filter((tel) => tel.length >= 10)
-    .map((tel) => (tel.startsWith("55") ? `@${tel}` : `@55${tel}`));
+    .map((tel) => {
+      // Se vier com DDI 55 (ex: 5551989286869 com 13 dígitos), remove o 55 para o padrão nacional ex: @51989286869
+      const numLimpo = tel.length >= 12 && tel.startsWith("55") ? tel.slice(2) : tel;
+      return `@${numLimpo}`;
+    });
+
   return [
-    `🚛 *ESCALA DE CARREGAMENTO - BETAXLOG*`,
+    `🚛 *ESCALA DE CARREGAMENTO — BETAXLOG*`,
     `📅 Data: ${formatarDataBR(data)}`,
     "",
     ...linhas,
     "",
-    ...(mencoes.length > 0 ? [...mencoes, ""] : []),
-    `Total de rotas: ${linhas.length}`,
+    ...(mencoes.length > 0
+      ? ["*Marcação dos motoristas confirmados:*", mencoes.join(" "), ""]
+      : []),
+    `Total de rotas: ${linhas.length} | Confirmados: ${confirmados.length}`,
   ].join("\n");
 }

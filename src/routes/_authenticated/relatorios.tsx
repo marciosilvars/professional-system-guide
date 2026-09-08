@@ -42,7 +42,13 @@ export const Route = createFileRoute("/_authenticated/relatorios")({
 
 type Linha = EscalaItem & { escalas: { data: string } | null };
 
-const CORES = ["oklch(0.55 0.16 255)", "oklch(0.65 0.15 150)", "oklch(0.62 0.2 25)"];
+const CORES = [
+  "oklch(0.55 0.16 255)", // Escaladas (azul)
+  "oklch(0.65 0.15 150)", // Confirmadas (verde)
+  "oklch(0.5 0.18 200)",  // Concluídas (ciano/azul petróleo)
+  "oklch(0.62 0.2 25)",   // Canceladas (laranja/vermelho claro)
+  "oklch(0.45 0.22 25)",  // Faltas (vermelho escuro)
+];
 
 function RelatoriosPage() {
   const hoje = new Date();
@@ -91,8 +97,10 @@ function RelatoriosPage() {
   const porStatus = useMemo(
     () => [
       { name: "Escaladas", value: linhas.filter((l) => l.status === "escalado").length },
+      { name: "Confirmadas", value: linhas.filter((l) => l.status === "confirmado").length },
       { name: "Concluídas", value: kpis.concluidas },
       { name: "Canceladas", value: kpis.canceladas },
+      { name: "Faltas", value: linhas.filter((l) => l.status === "falta").length },
     ],
     [linhas, kpis],
   );
