@@ -88,18 +88,24 @@ function EquipePage() {
   const { data: membros = [], isLoading } = useQuery({
     queryKey: ["equipe"],
     queryFn: async (): Promise<Membro[]> => {
-      const [{ data: perfis, error: e1 }, { data: papeis, error: e2 }] = await Promise.all([
+      const [res1, res2] = await Promise.all([
         supabase.from("profiles").select("id, nome, email, telefone").order("nome"),
         supabase.from("user_roles").select("user_id, role"),
       ]);
-      if (e1) throw e1;
-      if (e2) throw e2;
-      return (perfis ?? []).map((p) => ({
+      if (res1.error) {
+        toast.error("Erro ao carregar perfis: " + res1.error.message);
+        throw res1.error;
+      }
+      if (res2.error) {
+        toast.error("Erro ao carregar papéis: " + res2.error.message);
+        throw res2.error;
+      }
+      return (res1.data ?? []).map((p) => ({
         id: p.id,
         nome: p.nome,
         email: p.email,
         telefone: p.telefone ?? "",
-        papel: (papeis?.find((r) => r.user_id === p.id)?.role as Membro["papel"]) ?? null,
+        papel: (res2.data?.find((r) => r.user_id === p.id)?.role as Membro["papel"]) ?? null,
       }));
     },
   });
