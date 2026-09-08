@@ -35,10 +35,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRecoveryMode(true);
         setLoading(false);
         // Redireciona para a tela de nova senha independente de qual página estiver aberta.
-        // Preserva o hash (#access_token=...) para que o token não se perca na navegação.
+        // Usa sessionStorage como sinalizador para não precisar preservar o hash
+        // (reprocessar o hash duas vezes pode invalidar o token de recovery).
         if (typeof window !== "undefined" && window.location.pathname !== "/reset-password") {
-          const hash = window.location.hash || "";
-          window.location.replace("/reset-password" + hash);
+          sessionStorage.setItem("btx_recovery_pending", "1");
+          window.location.replace("/reset-password");
         }
         return;
       }
@@ -46,6 +47,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === "USER_UPDATED" && recoveryMode) {
         // Senha foi atualizada — sai do recovery mode, deixa roteamento normal.
         setRecoveryMode(false);
+      }
+
+      if (event === "SIGNED_OUT" || event === "SIGNED_IN") {
+        // Garante que o recoveryMode seja limpo se o usuário deslogar ou fizer um novo login.
+        setRecoveryMode(false);
+        sessionStorage.removeItem("btx_recovery_pending");
       }
 
       setSession(nextSession);
