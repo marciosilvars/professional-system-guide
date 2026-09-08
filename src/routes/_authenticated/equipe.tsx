@@ -32,7 +32,7 @@ import {
 export const Route = createFileRoute("/_authenticated/equipe")({
   head: () => ({
     meta: [
-      { title: "Equipe — BETAXLOG" },
+      { title: "Gerenciamento de Rotas — BETAXLOG" },
       {
         name: "description",
         content: "Gerenciamento de usuários e permissões: administradores e operadores.",

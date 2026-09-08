@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "BETAXLOG — Gestão profissional de escalas de motoristas" },
+      { title: "Gerenciamento de Rotas — BETAXLOG" },
       {
         name: "description",
         content:

@@ -24,7 +24,7 @@ import { Label } from "@/components/ui/label";
 export const Route = createFileRoute("/_authenticated/relatorios")({
   head: () => ({
     meta: [
-      { title: "Relatórios — BETAXLOG" }, // Corrigido: "Relatórios â€” BETAXLOG"
+      { title: "Gerenciamento de Rotas — BETAXLOG" },
       {
         name: "description",
         content: "Indicadores de escalas, rotas concluídas, cancelamentos e ranking de motoristas.",

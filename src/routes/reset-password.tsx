@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
     meta: [
-      { title: "Redefinir senha — BETAXLOG" },
+      { title: "Gerenciamento de Rotas — BETAXLOG" },
       { name: "description", content: "Defina sua nova senha para acessar o sistema BETAXLOG." },
       { name: "robots", content: "noindex" },
     ],

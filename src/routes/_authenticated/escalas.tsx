@@ -57,7 +57,7 @@ import {
 export const Route = createFileRoute("/_authenticated/escalas")({
   head: () => ({
     meta: [
-      { title: "Escala do dia — BETAXLOG" },
+      { title: "Gerenciamento de Rotas — BETAXLOG" },
       {
         name: "description",
         content:

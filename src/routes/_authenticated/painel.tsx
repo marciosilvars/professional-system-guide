@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/_authenticated/painel")({
   head: () => ({
     meta: [
-      { title: "Painel do dia — BETAXLOG" }, // Corrigido: "â€”" para "—"
+      { title: "Gerenciamento de Rotas — BETAXLOG" },
       {
         name: "description",
         content:

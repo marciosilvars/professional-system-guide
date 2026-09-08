@@ -79,7 +79,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "BETAXLOG — Gestão de Escalas de Motoristas" },
+      { title: "Gerenciamento de Rotas — BETAXLOG" },
       {
         name: "description",
         content:

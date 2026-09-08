@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Entrar — BETAXLOG" },
+      { title: "Gerenciamento de Rotas — BETAXLOG" },
       {
         name: "description",
         content: "Acesse o painel BETAXLOG para gerenciar escalas, motoristas e relatórios.",

@@ -30,7 +30,7 @@ import {
 export const Route = createFileRoute("/_authenticated/motoristas")({
   head: () => ({
     meta: [
-      { title: "Motoristas — BETAXLOG" },
+      { title: "Gerenciamento de Rotas — BETAXLOG" },
       {
         name: "description",
         content:

@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 export const Route = createFileRoute("/_authenticated/auditoria")({
   head: () => ({
     meta: [
-      { title: "Auditoria — BETAXLOG" },
+      { title: "Gerenciamento de Rotas — BETAXLOG" },
       {
         name: "description",
         content: "Histórico de ações dos usuários: quem fez o quê e quando no sistema BETAXLOG.",
