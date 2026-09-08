@@ -123,6 +123,7 @@ export const editarUsuario = createServerFn({ method: "POST" })
 
     const { error: erroAuth } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
       email: emailAjustado,
+      email_confirm: true,
       user_metadata: { nome: data.nome },
     });
     if (erroAuth) {
