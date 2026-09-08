@@ -702,7 +702,7 @@ function EscalasPage() {
                 Você deseja abrir o WhatsApp para enviar a escala para o grupo?
               </p>
               <p className="text-xs text-muted-foreground">
-                Será enviada a listagem das rotas e a <strong>marcação (@telefone)</strong> apenas dos motoristas com situação <strong>Confirmado</strong> (ex: @51989286869). O texto também será copiado para sua área de transferência.
+                Será enviada apenas a <strong>marcação (@telefone)</strong> de todos os motoristas escalados para facilitar a notificação no grupo (ex: @51989286869). O texto também será copiado para sua área de transferência.
               </p>
             </DialogDescription>
           </DialogHeader>

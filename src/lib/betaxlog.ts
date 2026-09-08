@@ -284,31 +284,18 @@ export interface LinhaCompartilhavel {
   status: string;
 }
 
-/**
- * Gera mensagem formatada para envio ao grupo do WhatsApp.
- * - Lista todas as rotas ativas (não canceladas).
- * - Ao final, insere a marcação (@telefone) APENAS dos motoristas com situação 'Confirmado',
- *   exemplo: @51989286869.
- */
 export function textoWhatsApp(data: string, itens: (NovoItem | LinhaCompartilhavel)[]): string {
-  const confirmados = itens.filter(
-    (i) => i.status === "confirmado" && i.motorista_nome !== VAGA_LIVRE,
+  // Pega todos os motoristas escalados que não estão cancelados, não são vaga livre e possuem telefone
+  const ativos = itens.filter(
+    (i) => i.status !== "cancelado" && i.motorista_nome !== VAGA_LIVRE && !!i.telefone
   );
-  const ativos = itens.filter((i) => i.status !== "cancelado");
 
-  const linhas = ativos.map((i, idx) => {
-    const statusIcon = i.status === "confirmado" ? "✅ " : i.status === "falta" ? "❌ [FALTA] " : "";
-    const ondaStr = i.onda ? ` — Onda ${i.onda}` : "";
-    const horarioStr = i.horario ? ` — ${i.horario}` : "";
-    return `${idx + 1}. ${statusIcon}*${i.motorista_nome}* — ${i.veiculo}${ondaStr}${horarioStr}`;
-  });
-
-  // Marcações (@telefone) exclusivamente dos motoristas com situação 'Confirmado'
-  const mencoes = confirmados
+  // Extrai apenas os números e formata a menção
+  const mencoes = ativos
     .map((i) => (i.telefone ?? "").replace(/\D/g, ""))
     .filter((tel) => tel.length >= 10)
     .map((tel) => {
-      // Se vier com DDI 55 (ex: 5551989286869 com 13 dígitos), remove o 55 para o padrão nacional ex: @51989286869
+      // Se vier com DDI 55, remove para manter padrão @DDDnumero
       const numLimpo = tel.length >= 12 && tel.startsWith("55") ? tel.slice(2) : tel;
       return `@${numLimpo}`;
     });
@@ -316,12 +303,6 @@ export function textoWhatsApp(data: string, itens: (NovoItem | LinhaCompartilhav
   return [
     `🚛 *ESCALA DE CARREGAMENTO — BETAXLOG*`,
     `📅 Data: ${formatarDataBR(data)}`,
-    "",
-    ...linhas,
-    "",
-    ...(mencoes.length > 0
-      ? ["*Marcação dos motoristas confirmados:*", mencoes.join(" "), ""]
-      : []),
-    `Total de rotas: ${linhas.length} | Confirmados: ${confirmados.length}`,
+    ...mencoes
   ].join("\n");
 }
