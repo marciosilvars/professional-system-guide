@@ -164,7 +164,7 @@ function EquipePage() {
     setSalvando(true);
     try {
       if (editandoId) {
-        await editarUsuarioFn({ data: { userId: editandoId, nome: novo.nome, email: novo.email, telefone: novo.telefone, papel: novo.papel } });
+        await editarUsuarioFn({ data: { userId: editandoId, nome: novo.nome, username: novo.username, email: novo.email, telefone: novo.telefone, papel: novo.papel } });
         await registrarAuditoria({
           acao: `editou dados de usuário`,
           entidade: "usuario",
