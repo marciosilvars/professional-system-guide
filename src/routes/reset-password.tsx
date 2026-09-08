@@ -80,11 +80,16 @@ function ResetPasswordPage() {
     setSalvando(false);
 
     if (error) {
-      toast.error(
-        error.message.includes("same")
-          ? "A nova senha não pode ser igual à senha atual."
-          : "Não foi possível atualizar a senha. Tente novamente.",
-      );
+      const msg = error.message.toLowerCase();
+      let erroTraduzido = "Não foi possível atualizar a senha. Tente novamente.";
+      
+      if (msg.includes("same") || msg.includes("different") || msg.includes("previously") || msg.includes("used") || msg.includes("recent")) {
+        erroTraduzido = "Esta senha já foi utilizada anteriormente. Por favor, escolha uma senha nova.";
+      } else if (msg.includes("weak") || msg.includes("character") || msg.includes("at least") || msg.includes("lowercase") || msg.includes("uppercase")) {
+        erroTraduzido = "A senha digitada é muito fácil. Escolha uma senha mais forte (letras, números e símbolos).";
+      }
+
+      toast.error(erroTraduzido);
       return;
     }
 

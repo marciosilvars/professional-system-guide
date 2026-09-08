@@ -398,8 +398,7 @@ function EscalasPage() {
       Motorista: i.motorista_nome,
       Telefone: i.telefone,
       Veículo: i.veiculo,
-      Onda: i.onda,
-      Horário: i.horario,
+      "Horário/ ONDA": i.horario,
       Situação: STATUS_ITEM_LABEL[i.status],
     }));
     const wb = XLSX.utils.book_new();
@@ -510,8 +509,7 @@ function EscalasPage() {
                   <th className="py-2 pr-3">DSP</th>
                   <th className="py-2 pr-3">Motorista</th>
                   <th className="py-2 pr-3">Veículo</th>
-                  <th className="py-2 pr-3">Onda</th>
-                  <th className="py-2 pr-3">Horário</th>
+                  <th className="py-2 pr-3">Horário/ ONDA</th>
                   <th className="py-2 pr-3">Situação</th>
                 </tr>
               </thead>
@@ -533,9 +531,6 @@ function EscalasPage() {
                     </td>
                     <td className="py-2 pr-3 min-w-52">
                       <div className="flex items-center gap-1">
-                        {item.prioritario && (
-                          <Star className="h-3.5 w-3.5 flex-shrink-0 fill-amber-400 text-amber-400" title="Prioritário" />
-                        )}
                         <Select
                           value={item.motorista_id ?? "vago"}
                           onValueChange={(v) => trocarMotorista(idx, v)}
@@ -560,16 +555,6 @@ function EscalasPage() {
                       <div className="flex h-8 w-32 items-center rounded-md border border-border bg-muted px-2 text-sm">
                         {item.veiculo || "—"}
                       </div>
-                    </td>
-                    <td className="py-2 pr-3">
-                      <Input
-                        className="h-8 w-20"
-                        type="number"
-                        min={0}
-                        value={item.onda}
-                        onChange={(e) => atualizarItem(idx, { onda: e.target.value })}
-                        disabled={definitiva}
-                      />
                     </td>
                     <td className="py-2 pr-3">
                       <Input
@@ -649,8 +634,7 @@ function EscalasPage() {
                   <th className="py-2.5 px-3">DSP</th>
                   <th className="py-2.5 px-3">Motorista</th>
                   <th className="py-2.5 px-3">Veículo</th>
-                  <th className="py-2.5 px-3 text-center">Onda</th>
-                  <th className="py-2.5 px-3 text-center">Horário</th>
+                  <th className="py-2.5 px-3 text-center">Horário/ ONDA</th>
                   <th className="py-2.5 px-3 text-center">Situação</th>
                 </tr>
               </thead>
@@ -666,7 +650,6 @@ function EscalasPage() {
                     <td className="py-2 px-3 font-bold text-slate-800">{DSP_PADRAO}</td>
                     <td className="py-2 px-3 font-medium text-slate-900">{item.motorista_nome}</td>
                     <td className="py-2 px-3 text-slate-700">{item.veiculo}</td>
-                    <td className="py-2 px-3 text-center text-slate-700">{item.onda || "—"}</td>
                     <td className="py-2 px-3 text-center font-mono font-semibold text-slate-800">{item.horario || "—"}</td>
                     <td className="py-2 px-3 text-center">
                       <span

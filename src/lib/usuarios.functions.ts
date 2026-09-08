@@ -30,11 +30,16 @@ export const criarUsuario = createServerFn({ method: "POST" })
       user_metadata: { nome: data.nome },
     });
     if (error || !criado.user) {
-      throw new Error(
-        error?.message?.includes("already")
-          ? "Este e-mail já está cadastrado."
-          : (error?.message ?? "Não foi possível criar o usuário."),
-      );
+      const msg = error?.message?.toLowerCase() ?? "";
+      let erroTraduzido = "Não foi possível criar o usuário.";
+
+      if (msg.includes("already")) {
+        erroTraduzido = "Este e-mail já está cadastrado.";
+      } else if (msg.includes("weak") || msg.includes("character") || msg.includes("at least") || msg.includes("lowercase") || msg.includes("uppercase")) {
+        erroTraduzido = "A senha definida é muito fácil. Escolha uma senha mais forte (letras, números e símbolos).";
+      }
+
+      throw new Error(erroTraduzido);
     }
 
     const novoId = criado.user.id;
@@ -76,7 +81,18 @@ export const alterarSenhaUsuario = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
       password: data.novaSenha,
     });
-    if (error) throw new Error(error.message ?? "Não foi possível alterar a senha.");
+    if (error) {
+      const msg = error.message.toLowerCase();
+      let erroTraduzido = "Não foi possível alterar a senha.";
+
+      if (msg.includes("same") || msg.includes("different") || msg.includes("previously") || msg.includes("used") || msg.includes("recent")) {
+        erroTraduzido = "Esta senha já foi utilizada anteriormente. Escolha uma senha nova.";
+      } else if (msg.includes("weak") || msg.includes("character") || msg.includes("at least") || msg.includes("lowercase") || msg.includes("uppercase")) {
+        erroTraduzido = "A nova senha digitada é muito fácil. Escolha uma senha mais forte (letras, números e símbolos).";
+      }
+
+      throw new Error(erroTraduzido);
+    }
     return { ok: true };
   });
 
