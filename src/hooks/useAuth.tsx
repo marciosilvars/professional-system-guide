@@ -30,12 +30,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (event === "PASSWORD_RECOVERY") {
-        // Usuário clicou no link do e-mail de reset — ativa recovery mode.
-        // Salvamos a sessão para que updateUser funcione, mas sinalizamos
-        // que o usuário AINDA não confirmou a nova senha.
+        // Sessão temporária de recovery — ativa o modo de redefinição de senha
         setSession(nextSession);
         setRecoveryMode(true);
         setLoading(false);
+        // Redireciona para a tela de nova senha independente de qual página estiver aberta
+        if (typeof window !== "undefined" && window.location.pathname !== "/reset-password") {
+          window.location.replace("/reset-password");
+        }
         return;
       }
 
