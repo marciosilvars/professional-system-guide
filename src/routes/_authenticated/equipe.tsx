@@ -3,10 +3,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ShieldCheck, Shield, UserPlus, Loader2, KeyRound, Mail } from "lucide-react";
+import { ShieldCheck, Shield, UserPlus, Loader2, KeyRound, Mail, Edit, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { criarUsuario, alterarSenhaUsuario } from "@/lib/usuarios.functions";
+import { criarUsuario, alterarSenhaUsuario, editarUsuario, excluirUsuario } from "@/lib/usuarios.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -69,16 +69,36 @@ function EquipePage() {
   const queryClient = useQueryClient();
   const criarUsuarioFn = useServerFn(criarUsuario);
   const alterarSenhaFn = useServerFn(alterarSenhaUsuario);
+  const editarUsuarioFn = useServerFn(editarUsuario);
+  const excluirUsuarioFn = useServerFn(excluirUsuario);
 
   const [dialogoAberto, setDialogoAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  const [novo, setNovo] = useState<{
-    nome: string;
-    email: string;
-    senha: string;
-    papel: "admin" | "operador";
-    telefone: string;
-  }>({ nome: "", email: "", senha: "", papel: "operador", telefone: "" });
+  
+  const estadoInicialForm = { nome: "", email: "", senha: "", papel: "operador" as const, telefone: "" };
+  const [novo, setNovo] = useState(estadoInicialForm);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+
+  const [membroExcluir, setMembroExcluir] = useState<Membro | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
+
+  const abrirParaCriar = () => {
+    setEditandoId(null);
+    setNovo(estadoInicialForm);
+    setDialogoAberto(true);
+  };
+
+  const abrirParaEditar = (m: Membro) => {
+    setEditandoId(m.id);
+    setNovo({
+      nome: m.nome,
+      email: m.email,
+      senha: "", // Na edição, a senha não é usada aqui (tem botão próprio)
+      papel: m.papel || "operador",
+      telefone: m.telefone || "",
+    });
+    setDialogoAberto(true);
+  };
 
   // Dialog de alteração de senha
   const [membroSenha, setMembroSenha] = useState<Membro | null>(null);
@@ -136,25 +156,56 @@ function EquipePage() {
     toast.success("Permissão atualizada.");
   };
 
-  const enviarNovoUsuario = async (e: React.FormEvent) => {
+  const salvarUsuario = async (e: React.FormEvent) => {
     e.preventDefault();
     setSalvando(true);
     try {
-      const criado = await criarUsuarioFn({ data: novo });
-      await registrarAuditoria({
-        acao: `cadastrou usuário como ${novo.papel}`,
-        entidade: "usuario",
-        entidadeId: criado.id,
-        detalhes: criado.email,
-      });
+      if (editandoId) {
+        await editarUsuarioFn({ data: { userId: editandoId, nome: novo.nome, email: novo.email, telefone: novo.telefone, papel: novo.papel } });
+        await registrarAuditoria({
+          acao: `editou dados de usuário`,
+          entidade: "usuario",
+          entidadeId: editandoId,
+          detalhes: novo.email,
+        });
+        toast.success("Usuário atualizado com sucesso.");
+      } else {
+        const criado = await criarUsuarioFn({ data: novo });
+        await registrarAuditoria({
+          acao: `cadastrou usuário como ${novo.papel}`,
+          entidade: "usuario",
+          entidadeId: criado.id,
+          detalhes: criado.email,
+        });
+        toast.success("Usuário cadastrado com sucesso.");
+      }
       await queryClient.invalidateQueries({ queryKey: ["equipe"] });
-      toast.success("Usuário cadastrado com sucesso.");
-      setNovo({ nome: "", email: "", senha: "", papel: "operador", telefone: "" });
       setDialogoAberto(false);
     } catch (erro) {
-      toast.error(erro instanceof Error ? erro.message : "Não foi possível criar o usuário.");
+      toast.error(erro instanceof Error ? erro.message : "Não foi possível salvar o usuário.");
     } finally {
       setSalvando(false);
+    }
+  };
+
+  const confirmarExclusao = async () => {
+    if (!membroExcluir) return;
+    setExcluindo(true);
+    try {
+      await excluirUsuarioFn({ data: { userId: membroExcluir.id } });
+      await registrarAuditoria({
+        acao: `excluiu usuário`,
+        entidade: "usuario",
+        entidadeId: membroExcluir.id,
+        detalhes: membroExcluir.email,
+      });
+      toast.success("Usuário excluído definitivamente.");
+      setMembroExcluir(null);
+      await queryClient.invalidateQueries({ queryKey: ["equipe"] });
+    } catch (erro) {
+      toast.error(erro instanceof Error ? erro.message : "Não foi possível excluir.");
+    } finally {
+      setExcluindo(false);
     }
   };
 
@@ -201,90 +252,115 @@ function EquipePage() {
           </p>
         </div>
         {isAdmin && (
-          <Dialog open={dialogoAberto} onOpenChange={setDialogoAberto}>
-            <DialogTrigger asChild>
-              <Button>
-                <UserPlus className="mr-2 h-4 w-4" /> Adicionar usuário
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Novo usuário</DialogTitle>
-                <DialogDescription>
-                  Crie o acesso com e-mail e senha. O usuário já entra liberado na plataforma.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={enviarNovoUsuario} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="novo-nome">Nome</Label>
-                  <Input
-                    id="novo-nome"
-                    required
-                    value={novo.nome}
-                    onChange={(e) => setNovo({ ...novo, nome: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="novo-email">E-mail</Label>
-                  <Input
-                    id="novo-email"
-                    type="email"
-                    required
-                    value={novo.email}
-                    onChange={(e) => setNovo({ ...novo, email: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="novo-telefone">Telefone (DDD + número)</Label>
-                  <Input
-                    id="novo-telefone"
-                    type="tel"
-                    placeholder="51 98989-8989"
-                    value={novo.telefone}
-                    onChange={(e) =>
-                      setNovo({ ...novo, telefone: formatarTelefone(e.target.value) })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="nova-senha">Senha provisória</Label>
-                  <Input
-                    id="nova-senha"
-                    type="text"
-                    required
-                    minLength={6}
-                    value={novo.senha}
-                    onChange={(e) => setNovo({ ...novo, senha: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Permissão</Label>
-                  <Select
-                    value={novo.papel}
-                    onValueChange={(v) =>
-                      setNovo({ ...novo, papel: v as "admin" | "operador" })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">Administrador</SelectItem>
-                      <SelectItem value="operador">Operador</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <DialogFooter>
-                  <Button type="submit" disabled={salvando}>
-                    {salvando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Cadastrar
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <Button onClick={abrirParaCriar}>
+            <UserPlus className="mr-2 h-4 w-4" /> Adicionar usuário
+          </Button>
         )}
       </header>
+
+      {/* Dialog de Criação / Edição */}
+      <Dialog open={dialogoAberto} onOpenChange={setDialogoAberto}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editandoId ? "Editar usuário" : "Novo usuário"}</DialogTitle>
+            <DialogDescription>
+              {editandoId
+                ? "Altere as informações do usuário abaixo."
+                : "Crie o acesso com e-mail ou nome de usuário. O usuário já entra liberado na plataforma."}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={salvarUsuario} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="novo-nome">Nome</Label>
+              <Input
+                id="novo-nome"
+                required
+                value={novo.nome}
+                onChange={(e) => setNovo({ ...novo, nome: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="novo-email">E-mail ou Usuário</Label>
+              <Input
+                id="novo-email"
+                type="text"
+                required
+                value={novo.email}
+                onChange={(e) => setNovo({ ...novo, email: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="novo-telefone">Telefone (DDD + número)</Label>
+              <Input
+                id="novo-telefone"
+                type="tel"
+                placeholder="51 98989-8989"
+                value={novo.telefone}
+                onChange={(e) =>
+                  setNovo({ ...novo, telefone: formatarTelefone(e.target.value) })
+                }
+              />
+            </div>
+            {!editandoId && (
+              <div className="space-y-2">
+                <Label htmlFor="nova-senha">Senha provisória</Label>
+                <Input
+                  id="nova-senha"
+                  type="text"
+                  required
+                  minLength={6}
+                  value={novo.senha}
+                  onChange={(e) => setNovo({ ...novo, senha: e.target.value })}
+                />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Permissão</Label>
+              <Select
+                value={novo.papel}
+                onValueChange={(v) =>
+                  setNovo({ ...novo, papel: v as "admin" | "operador" })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Administrador</SelectItem>
+                  <SelectItem value="operador">Operador</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={salvando}>
+                {salvando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editandoId ? "Salvar alterações" : "Cadastrar"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Exclusão */}
+      <Dialog open={!!membroExcluir} onOpenChange={(v) => !v && setMembroExcluir(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir usuário</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir <strong>{membroExcluir?.nome}</strong>? O acesso será revogado permanentemente.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMembroExcluir(null)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={confirmarExclusao} disabled={excluindo}>
+              {excluindo && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Sim, excluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog de alteração de senha */}
       <Dialog open={!!membroSenha} onOpenChange={(v) => { if (!v) { setMembroSenha(null); setNovaSenha(""); } }}>
@@ -348,7 +424,9 @@ function EquipePage() {
                     <p className="truncate text-sm font-medium">
                       {m.nome} {m.id === user?.id && <Badge variant="outline">você</Badge>}
                     </p>
-                    <p className="truncate text-xs text-muted-foreground">{m.email}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {m.email.replace("@betaxlog.local", "")}
+                    </p>
                     {m.telefone && (
                       <p className="truncate text-xs text-muted-foreground">{m.telefone}</p>
                     )}
@@ -363,6 +441,27 @@ function EquipePage() {
                       >
                         <KeyRound className="h-4 w-4" />
                       </Button>
+                    )}
+                    {isAdmin && m.id !== user?.id && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => abrirParaEditar(m)}
+                          title="Editar informações"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:bg-destructive/10"
+                          onClick={() => setMembroExcluir(m)}
+                          title="Excluir usuário"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
                     )}
                     {isAdmin ? (
                       <Select

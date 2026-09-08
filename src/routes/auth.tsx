@@ -48,12 +48,18 @@ function AuthPage() {
   const entrar = async (e: React.FormEvent) => {
     e.preventDefault();
     setEnviando(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
+    
+    let loginId = email.trim();
+    if (loginId && !loginId.includes("@")) {
+      loginId = `${loginId.toLowerCase()}@betaxlog.local`;
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({ email: loginId, password: senha });
     setEnviando(false);
     if (error) {
       toast.error(
         error.message.includes("Invalid login")
-          ? "E-mail ou senha incorretos."
+          ? "Usuário/E-mail ou senha incorretos."
           : error.message,
       );
       return;
@@ -65,16 +71,22 @@ function AuthPage() {
   const recuperarSenha = async (e: React.FormEvent) => {
     e.preventDefault();
     setEnviandoRecuperacao(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(emailRecuperacao, {
+
+    let loginId = emailRecuperacao.trim();
+    if (loginId && !loginId.includes("@")) {
+      loginId = `${loginId.toLowerCase()}@betaxlog.local`;
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(loginId, {
       // Redireciona para a rota exclusiva de redefinição, que escuta PASSWORD_RECOVERY
       redirectTo: `${window.location.origin}/reset-password`,
     });
     setEnviandoRecuperacao(false);
     if (error) {
-      toast.error("Não foi possível enviar o e-mail. Verifique o endereço informado.");
+      toast.error("Não foi possível enviar o e-mail. Verifique o usuário informado.");
       return;
     }
-    toast.success("E-mail de recuperação enviado! Verifique sua caixa de entrada.");
+    toast.success("Solicitação processada com sucesso.");
     setMostraRecuperacao(false);
     setEmailRecuperacao("");
   };
@@ -108,23 +120,23 @@ function AuthPage() {
             <div>
               <h2 className="mb-1 text-xl font-semibold">Recuperar senha</h2>
               <p className="mb-6 text-sm text-muted-foreground">
-                Informe seu e-mail e enviaremos um link para redefinir sua senha.
+                Informe seu usuário ou e-mail cadastrado.
               </p>
               <form onSubmit={recuperarSenha} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email-recuperacao">E-mail</Label>
+                  <Label htmlFor="email-recuperacao">Usuário ou E-mail</Label>
                   <Input
                     id="email-recuperacao"
-                    type="email"
+                    type="text"
                     required
-                    autoComplete="email"
+                    autoComplete="username"
                     value={emailRecuperacao}
                     onChange={(e) => setEmailRecuperacao(e.target.value)}
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={enviandoRecuperacao}>
                   {enviandoRecuperacao && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Enviar link de recuperação
+                  Enviar solicitação
                 </Button>
                 <Button
                   type="button"
@@ -141,12 +153,12 @@ function AuthPage() {
               <h2 className="mb-6 text-xl font-semibold">Entrar no sistema</h2>
               <form onSubmit={entrar} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">E-mail</Label>
+                  <Label htmlFor="email">Usuário ou E-mail</Label>
                   <Input
                     id="email"
-                    type="email"
+                    type="text"
                     required
-                    autoComplete="email"
+                    autoComplete="username"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />

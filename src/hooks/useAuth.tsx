@@ -93,6 +93,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [userId, recoveryMode]);
 
+  // Temporizador de Inatividade (30 minutos)
+  useEffect(() => {
+    if (!userId) return; // Só aplica se estiver logado
+
+    const TIMEOUT_MS = 30 * 60 * 1000; // 30 minutos
+    let idleTimer: NodeJS.Timeout;
+
+    const resetTimer = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        // Desloga por inatividade
+        void supabase.auth.signOut().then(() => {
+          if (typeof window !== "undefined") {
+            window.location.replace("/auth?motivo=inatividade");
+          }
+        });
+      }, TIMEOUT_MS);
+    };
+
+    // Inicia o timer
+    resetTimer();
+
+    // Eventos que indicam atividade do usuário
+    const eventos = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+    eventos.forEach((evento) => window.addEventListener(evento, resetTimer));
+
+    return () => {
+      clearTimeout(idleTimer);
+      eventos.forEach((evento) => window.removeEventListener(evento, resetTimer));
+    };
+  }, [userId]);
+
   const value = useMemo<AuthState>(
     () => ({
       user: session?.user ?? null,
