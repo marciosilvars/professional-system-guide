@@ -50,8 +50,15 @@ function AuthPage() {
     setEnviando(true);
     
     let loginId = email.trim();
-    if (loginId && !loginId.includes("@")) {
-      loginId = `${loginId.toLowerCase()}@betaxlog.local`;
+    if (!loginId.includes("@")) {
+      // É um nome de usuário. Tenta buscar o e-mail real no banco de dados primeiro.
+      const { data: realEmail, error: rpcError } = await supabase.rpc("get_email_by_username", { p_username: loginId.toLowerCase() });
+      if (!rpcError && realEmail) {
+        loginId = realEmail;
+      } else {
+        // Fallback para o padrão antigo (e-mail falso)
+        loginId = `${loginId.toLowerCase()}@betaxlog.local`;
+      }
     }
 
     const { error } = await supabase.auth.signInWithPassword({ email: loginId, password: senha });
@@ -73,8 +80,13 @@ function AuthPage() {
     setEnviandoRecuperacao(true);
 
     let loginId = emailRecuperacao.trim();
-    if (loginId && !loginId.includes("@")) {
-      loginId = `${loginId.toLowerCase()}@betaxlog.local`;
+    if (!loginId.includes("@")) {
+      const { data: realEmail, error: rpcError } = await supabase.rpc("get_email_by_username", { p_username: loginId.toLowerCase() });
+      if (!rpcError && realEmail) {
+        loginId = realEmail;
+      } else {
+        loginId = `${loginId.toLowerCase()}@betaxlog.local`;
+      }
     }
 
     const { error } = await supabase.auth.resetPasswordForEmail(loginId, {
@@ -83,10 +95,10 @@ function AuthPage() {
     });
     setEnviandoRecuperacao(false);
     if (error) {
-      toast.error("Não foi possível enviar o e-mail. Verifique o usuário informado.");
+      toast.error("Não foi possível enviar o e-mail. Verifique o usuário ou e-mail informado.");
       return;
     }
-    toast.success("Solicitação processada com sucesso.");
+    toast.success("Se o e-mail existir, você receberá as instruções em breve.");
     setMostraRecuperacao(false);
     setEmailRecuperacao("");
   };

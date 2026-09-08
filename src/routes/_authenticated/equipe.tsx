@@ -51,7 +51,8 @@ export const Route = createFileRoute("/_authenticated/equipe")({
 interface Membro {
   id: string;
   nome: string;
-  email: string;
+  username: string;
+  email: string | null;
   telefone?: string;
   papel: "admin" | "operador" | null;
 }
@@ -75,7 +76,7 @@ function EquipePage() {
   const [dialogoAberto, setDialogoAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
   
-  const estadoInicialForm = { nome: "", email: "", senha: "", papel: "operador" as const, telefone: "" };
+  const estadoInicialForm = { nome: "", username: "", email: "", senha: "", papel: "operador" as const, telefone: "" };
   const [novo, setNovo] = useState(estadoInicialForm);
   const [editandoId, setEditandoId] = useState<string | null>(null);
 
@@ -92,7 +93,8 @@ function EquipePage() {
     setEditandoId(m.id);
     setNovo({
       nome: m.nome,
-      email: m.email,
+      username: m.username,
+      email: m.email || "",
       senha: "", // Na edição, a senha não é usada aqui (tem botão próprio)
       papel: m.papel || "operador",
       telefone: m.telefone || "",
@@ -123,7 +125,8 @@ function EquipePage() {
       return (res1.data ?? []).map((p) => ({
         id: p.id,
         nome: p.nome,
-        email: p.email,
+        username: p.username || (p.email ? p.email.split("@")[0] : p.nome.split(" ")[0].toLowerCase()), // fallback temporário
+        email: p.email?.includes("@betaxlog.local") ? null : p.email,
         telefone: p.telefone ?? "",
         papel: (res2.data?.find((r) => r.user_id === p.id)?.role as Membro["papel"]) ?? null,
       }));
@@ -280,11 +283,22 @@ function EquipePage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="novo-email">E-mail ou Usuário</Label>
+              <Label htmlFor="novo-username">Nome de Usuário</Label>
               <Input
-                id="novo-email"
+                id="novo-username"
                 type="text"
                 required
+                placeholder="Ex: eduardo"
+                value={novo.username}
+                onChange={(e) => setNovo({ ...novo, username: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="novo-email">E-mail (Opcional - para recuperação)</Label>
+              <Input
+                id="novo-email"
+                type="email"
+                placeholder="Ex: eduardo@email.com"
                 value={novo.email}
                 onChange={(e) => setNovo({ ...novo, email: e.target.value })}
               />
@@ -425,7 +439,7 @@ function EquipePage() {
                       {m.nome} {m.id === user?.id && <Badge variant="outline">você</Badge>}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {m.email.replace("@betaxlog.local", "")}
+                      @{m.username} {m.email && <span className="opacity-70">({m.email})</span>}
                     </p>
                     {m.telefone && (
                       <p className="truncate text-xs text-muted-foreground">{m.telefone}</p>

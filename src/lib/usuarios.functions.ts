@@ -10,7 +10,8 @@ export const formatarEmailOuUsuario = (valor: string) => {
 
 const schema = z.object({
   nome: z.string().trim().min(2, "Informe o nome"),
-  email: z.string().trim().min(3, "Informe o usuário ou e-mail"),
+  username: z.string().trim().min(3, "Informe o nome de usuário (mínimo 3 caracteres)").regex(/^[a-zA-Z0-9_.-]+$/, "Apenas letras, números, pontos, hífens ou underlines"),
+  email: z.string().trim().email("Informe um e-mail válido").optional().or(z.literal('')),
   senha: z.string().min(6, "A senha precisa ter ao menos 6 caracteres"),
   papel: z.enum(["admin", "operador"]),
   telefone: z.string().trim().optional(),
@@ -28,20 +29,20 @@ export const criarUsuario = createServerFn({ method: "POST" })
     if (!ehAdmin) throw new Error("Apenas administradores podem cadastrar usuários.");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const emailAjustado = formatarEmailOuUsuario(data.email);
+    const emailAjustado = data.email ? data.email.toLowerCase() : `${data.username.toLowerCase()}@betaxlog.local`;
 
     const { data: criado, error } = await supabaseAdmin.auth.admin.createUser({
       email: emailAjustado,
       password: data.senha,
       email_confirm: true,
-      user_metadata: { nome: data.nome },
+      user_metadata: { nome: data.nome, username: data.username.toLowerCase() },
     });
     if (error || !criado.user) {
       const msg = error?.message?.toLowerCase() ?? "";
       let erroTraduzido = "Não foi possível criar o usuário.";
 
       if (msg.includes("already")) {
-        erroTraduzido = "Este e-mail já está cadastrado.";
+        erroTraduzido = "Este e-mail ou nome de usuário já está cadastrado.";
       } else if (msg.includes("weak") || msg.includes("character") || msg.includes("at least") || msg.includes("lowercase") || msg.includes("uppercase")) {
         erroTraduzido = "A senha definida é muito fácil. Escolha uma senha mais forte (letras, números e símbolos).";
       }
@@ -53,7 +54,7 @@ export const criarUsuario = createServerFn({ method: "POST" })
 
     await supabaseAdmin
       .from("profiles")
-      .upsert({ id: novoId, nome: data.nome, email: data.email, ...(data.telefone ? { telefone: data.telefone } : {}) });
+      .upsert({ id: novoId, nome: data.nome, email: data.email || null, username: data.username.toLowerCase(), ...(data.telefone ? { telefone: data.telefone } : {}) });
 
     await supabaseAdmin.from("user_roles").delete().eq("user_id", novoId);
     const { error: erroRole } = await supabaseAdmin
@@ -61,7 +62,7 @@ export const criarUsuario = createServerFn({ method: "POST" })
       .insert({ user_id: novoId, role: data.papel });
     if (erroRole) throw new Error("Usuário criado, mas a permissão não foi aplicada.");
 
-    return { id: novoId, nome: data.nome, email: data.email, papel: data.papel };
+    return { id: novoId, nome: data.nome, email: data.email || null, username: data.username.toLowerCase(), papel: data.papel };
   });
 
 const alterarSenhaSchema = z.object({
@@ -106,7 +107,8 @@ export const alterarSenhaUsuario = createServerFn({ method: "POST" })
 const editarSchema = z.object({
   userId: z.string().uuid(),
   nome: z.string().trim().min(2, "Informe o nome"),
-  email: z.string().trim().min(3, "Informe o usuário ou e-mail"),
+  username: z.string().trim().min(3, "Informe o nome de usuário (mínimo 3 caracteres)").regex(/^[a-zA-Z0-9_.-]+$/, "Apenas letras, números, pontos, hífens ou underlines"),
+  email: z.string().trim().email("Informe um e-mail válido").optional().or(z.literal('')),
   papel: z.enum(["admin", "operador"]),
   telefone: z.string().trim().optional(),
 });
@@ -119,12 +121,12 @@ export const editarUsuario = createServerFn({ method: "POST" })
     if (!ehAdmin) throw new Error("Apenas administradores podem editar usuários.");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const emailAjustado = formatarEmailOuUsuario(data.email);
+    const emailAjustado = data.email ? data.email.toLowerCase() : `${data.username.toLowerCase()}@betaxlog.local`;
 
     const { error: erroAuth } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
       email: emailAjustado,
       email_confirm: true,
-      user_metadata: { nome: data.nome },
+      user_metadata: { nome: data.nome, username: data.username.toLowerCase() },
     });
     if (erroAuth) {
       if (erroAuth.message.includes("already")) throw new Error("Este usuário/e-mail já está em uso.");
@@ -133,7 +135,7 @@ export const editarUsuario = createServerFn({ method: "POST" })
 
     await supabaseAdmin
       .from("profiles")
-      .update({ nome: data.nome, email: data.email, telefone: data.telefone || null })
+      .update({ nome: data.nome, email: data.email || null, username: data.username.toLowerCase(), telefone: data.telefone || null })
       .eq("id", data.userId);
 
     await supabaseAdmin.from("user_roles").delete().eq("user_id", data.userId);
