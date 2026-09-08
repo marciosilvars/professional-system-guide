@@ -22,6 +22,15 @@ export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) throw redirect({ to: "/auth" });
+
+    // Verifica se o token atual é de recovery (type=recovery no hash ou AMR claim).
+    // Nesse caso o usuário foi autenticado temporariamente apenas para poder
+    // redefinir a senha — não deve acessar o painel até concluir o processo.
+    const { data: sessionData } = await supabase.auth.getSession();
+    const amr = sessionData.session?.user?.app_metadata?.amr as { method: string }[] | undefined;
+    const isRecovery = Array.isArray(amr) && amr.some((a) => a.method === "recovery");
+    if (isRecovery) throw redirect({ to: "/reset-password" });
+
     return { user: data.user };
   },
   component: AppShell,

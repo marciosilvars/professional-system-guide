@@ -12,6 +12,9 @@ interface AuthState {
   isAdmin: boolean;
   loading: boolean;
   nome: string;
+  /** true enquanto o Supabase emitiu PASSWORD_RECOVERY e o usuário ainda não definiu nova senha */
+  recoveryMode: boolean;
+  clearRecoveryMode: () => void;
   signOut: () => Promise<void>;
 }
 
@@ -22,9 +25,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [nome, setNome] = useState("");
   const [loading, setLoading] = useState(true);
+  const [recoveryMode, setRecoveryMode] = useState(false);
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === "PASSWORD_RECOVERY") {
+        // Usuário clicou no link do e-mail de reset — ativa recovery mode.
+        // Salvamos a sessão para que updateUser funcione, mas sinalizamos
+        // que o usuário AINDA não confirmou a nova senha.
+        setSession(nextSession);
+        setRecoveryMode(true);
+        setLoading(false);
+        return;
+      }
+
+      if (event === "USER_UPDATED" && recoveryMode) {
+        // Senha foi atualizada — sai do recovery mode, deixa roteamento normal.
+        setRecoveryMode(false);
+      }
+
       setSession(nextSession);
       setLoading(false);
       if (!nextSession) {
@@ -39,12 +58,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => sub.subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const userId = session?.user.id;
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || recoveryMode) return;
     let cancelled = false;
 
     void (async () => {
@@ -60,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, recoveryMode]);
 
   const value = useMemo<AuthState>(
     () => ({
@@ -70,11 +90,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin: roles.includes("admin"),
       loading,
       nome,
+      recoveryMode,
+      clearRecoveryMode: () => setRecoveryMode(false),
       signOut: async () => {
         await supabase.auth.signOut();
       },
     }),
-    [session, roles, loading, nome],
+    [session, roles, loading, nome, recoveryMode],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

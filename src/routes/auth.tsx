@@ -29,7 +29,7 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
-  const { user, loading } = useAuth();
+  const { user, loading, recoveryMode } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -39,8 +39,11 @@ function AuthPage() {
   const [enviandoRecuperacao, setEnviandoRecuperacao] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) void navigate({ to: "/escalas" });
-  }, [loading, user, navigate]);
+    // Não redireciona para o painel se o usuário está em recovery mode —
+    // ele precisa primeiro definir a nova senha em /reset-password.
+    if (!loading && user && !recoveryMode) void navigate({ to: "/escalas" });
+    if (!loading && recoveryMode) void navigate({ to: "/reset-password" });
+  }, [loading, user, recoveryMode, navigate]);
 
   const entrar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,7 +66,8 @@ function AuthPage() {
     e.preventDefault();
     setEnviandoRecuperacao(true);
     const { error } = await supabase.auth.resetPasswordForEmail(emailRecuperacao, {
-      redirectTo: `${window.location.origin}/auth`,
+      // Redireciona para a rota exclusiva de redefinição, que escuta PASSWORD_RECOVERY
+      redirectTo: `${window.location.origin}/reset-password`,
     });
     setEnviandoRecuperacao(false);
     if (error) {
