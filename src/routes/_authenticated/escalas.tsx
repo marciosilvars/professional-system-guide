@@ -14,6 +14,7 @@ import {
   Star,
 } from "lucide-react";
 import { toast } from "sonner";
+import html2canvas from "html2canvas";
 import { supabase } from "@/integrations/supabase/client";
 import { registrarAuditoria } from "@/lib/auditoria";
 import {
@@ -353,7 +354,6 @@ function EscalasPage() {
     if (!alvo) return;
     try {
       toast.info("Gerando imagem da escala...");
-      const html2canvas = (await import("html2canvas")).default;
 
       // Move temporariamente para posição visível controlada no topo para captura fiel
       alvo.style.left = "0px";
@@ -365,7 +365,7 @@ function EscalasPage() {
         backgroundColor: "#ffffff",
         scale: 2,
         useCORS: true,
-        logging: false,
+        logging: true, // Enable logging to see what fails
       });
 
       // Restaura para oculto
@@ -379,14 +379,17 @@ function EscalasPage() {
       link.href = canvas.toDataURL("image/png");
       link.click();
       toast.success("Imagem gerada e baixada com sucesso!");
-    } catch {
+    } catch (erro) {
+      console.error("Erro completo ao gerar imagem (html2canvas):", erro);
       if (alvo) {
         alvo.style.left = "-9999px";
         alvo.style.top = "0px";
         alvo.style.opacity = "0";
         alvo.style.zIndex = "-100";
       }
-      toast.error("Não foi possível gerar a imagem da escala.");
+      toast.error(
+        "Não foi possível gerar a imagem. Verifique o console do navegador para detalhes."
+      );
     }
   };
 
