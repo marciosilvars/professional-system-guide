@@ -118,7 +118,9 @@ export const editarUsuario = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => editarSchema.parse(data))
   .handler(async ({ data, context }) => {
     const { data: ehAdmin } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
-    if (!ehAdmin) throw new Error("Apenas administradores podem editar usuários.");
+    const isSelf = data.userId === context.userId;
+
+    if (!ehAdmin && !isSelf) throw new Error("Apenas administradores podem editar outros usuários.");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const emailAjustado = data.email ? data.email.toLowerCase() : `${data.username.toLowerCase()}@betaxlog.local`;
@@ -138,9 +140,12 @@ export const editarUsuario = createServerFn({ method: "POST" })
       .update({ nome: data.nome, email: data.email || null, username: data.username.toLowerCase(), telefone: data.telefone || null })
       .eq("id", data.userId);
 
-    await supabaseAdmin.from("user_roles").delete().eq("user_id", data.userId);
-    const { error: erroRole } = await supabaseAdmin.from("user_roles").insert({ user_id: data.userId, role: data.papel });
-    if (erroRole) throw new Error("Não foi possível atualizar a permissão do usuário.");
+    // Apenas administradores podem mudar o papel
+    if (ehAdmin) {
+      await supabaseAdmin.from("user_roles").delete().eq("user_id", data.userId);
+      const { error: erroRole } = await supabaseAdmin.from("user_roles").insert({ user_id: data.userId, role: data.papel });
+      if (erroRole) throw new Error("Não foi possível atualizar a permissão do usuário.");
+    }
 
     return { ok: true };
   });

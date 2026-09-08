@@ -456,26 +456,26 @@ function EquipePage() {
                         <KeyRound className="h-4 w-4" />
                       </Button>
                     )}
+                    {(isAdmin || m.id === user?.id) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => abrirParaEditar(m)}
+                        title="Editar informações"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
                     {isAdmin && m.id !== user?.id && (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => abrirParaEditar(m)}
-                          title="Editar informações"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:bg-destructive/10"
-                          onClick={() => setMembroExcluir(m)}
-                          title="Excluir usuário"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:bg-destructive/10"
+                        onClick={() => setMembroExcluir(m)}
+                        title="Excluir usuário"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     )}
                     {isAdmin ? (
                       <Select
