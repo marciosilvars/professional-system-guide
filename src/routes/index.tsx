@@ -98,8 +98,15 @@ function Landing() {
         </div>
       </section>
 
-      <footer className="border-t border-border py-8 text-center text-sm text-muted-foreground">
-        BETAXLOG · Sistema interno de gestão de escalas
+      <footer className="border-t border-border py-8 text-center text-xs text-muted-foreground">
+        <p>
+          &copy; {new Date().getFullYear()}{" "}
+          <a href="mailto:marciomsilva.dev@gmail.com" className="font-medium hover:underline text-primary/80 transition-colors">
+            MMS Sistemas
+          </a>
+          . Todos os direitos reservados.
+        </p>
+        <p className="mt-1">Gestão de Escalas | Desenvolvido para BETAXLOG</p>
       </footer>
     </main>
   );
