@@ -90,6 +90,8 @@ function EscalasPage() {
   const [busca, setBusca] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [dialogoWhatsApp, setDialogoWhatsApp] = useState(false);
+  // Diálogo de cancelamento de rota
+  const [rotaCancelando, setRotaCancelando] = useState<{ idx: number; item: NovoItem } | null>(null);
 
   const motoristasQuery = useQuery({
     queryKey: ["motoristas"],
@@ -179,6 +181,18 @@ function EscalasPage() {
       toast.warning("Gere a prévia da escala antes de salvar.");
       return;
     }
+
+    // Validação: todos os horários devem estar preenchidos
+    const itensSemHorario = itens.filter(
+      (i) => i.status !== "cancelado" && (!i.horario || !i.horario.trim())
+    );
+    if (itensSemHorario.length > 0) {
+      toast.warning(
+        `Preencha o horário de todos os motoristas antes de salvar. ${itensSemHorario.length} vaga${itensSemHorario.length > 1 ? "s" : ""} sem horário.`
+      );
+      return;
+    }
+
     setSalvando(true);
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -211,7 +225,7 @@ function EscalasPage() {
         if (erroUpdate) throw erroUpdate;
         escalaSalva = atualizada;
       } else {
-        // Cria nova escala
+        // Cria nova escala — sem created_by (coluna pode não existir no cache do schema)
         const { data: criada, error: erroInsert } = await supabase
           .from("escalas")
           .insert({
@@ -221,7 +235,6 @@ function EscalasPage() {
             vagas_passeio: vagas.passeio,
             status,
             indisponiveis: Array.from(indisponiveis),
-            created_by: userData.user?.id ?? null,
           })
           .select("id")
           .single();
@@ -639,21 +652,21 @@ function EscalasPage() {
                       {!definitiva && item.status !== "cancelado" && (
                         <button
                           type="button"
-                          title="Cancelar rota"
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                          onClick={() => atualizarItem(idx, { status: "cancelado" })}
+                          title="Cancelar esta rota"
+                          className="inline-flex items-center gap-1 rounded-full border border-destructive/40 bg-destructive/10 px-2.5 py-0.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground"
+                          onClick={() => setRotaCancelando({ idx, item })}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <span>&#10005;</span> Cancelar rota
                         </button>
                       )}
                       {!definitiva && item.status === "cancelado" && (
                         <button
                           type="button"
                           title="Reativar rota"
-                          className="inline-flex h-8 w-auto items-center justify-center rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          className="inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                           onClick={() => atualizarItem(idx, { status: "escalado" })}
                         >
-                          Reativar
+                          ↺ Reativar
                         </button>
                       )}
                     </td>
@@ -756,7 +769,7 @@ function EscalasPage() {
         </section>
       )}
 
-      {/* Dialog confirmação WhatsApp */}
+      {/* Dialog confirmação WhatsApp — envio da escala para o grupo */}
       <Dialog open={dialogoWhatsApp} onOpenChange={setDialogoWhatsApp}>
         <DialogContent>
           <DialogHeader>
@@ -776,6 +789,53 @@ function EscalasPage() {
             </Button>
             <Button onClick={() => void abrirWhatsApp()}>
               Sim, abrir WhatsApp
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de cancelamento de rota com opção de notificar motorista */}
+      <Dialog open={!!rotaCancelando} onOpenChange={(v) => { if (!v) setRotaCancelando(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancelar Rota</DialogTitle>
+            <DialogDescription className="space-y-2 pt-2">
+              <p>
+                Você está cancelando a rota de <strong>{rotaCancelando?.item.motorista_nome}</strong>.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Deseja enviar uma mensagem de aviso pelo WhatsApp para o motorista?
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (rotaCancelando) atualizarItem(rotaCancelando.idx, { status: "cancelado" });
+                setRotaCancelando(null);
+              }}
+            >
+              Cancelar sem avisar
+            </Button>
+            <Button
+              onClick={() => {
+                if (rotaCancelando) {
+                  atualizarItem(rotaCancelando.idx, { status: "cancelado" });
+                  const tel = (rotaCancelando.item.telefone || "").replace(/\D/g, "");
+                  const numero = tel ? (tel.startsWith("55") ? tel : `55${tel}`) : "";
+                  const msg = mensagemCancelamentoRota(rotaCancelando.item.motorista_nome, data);
+                  if (numero) {
+                    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
+                  } else {
+                    toast.warning("Motorista sem telefone cadastrado. Avise manualmente.");
+                  }
+                  setRotaCancelando(null);
+                }
+              }}
+            >
+              <MessageSquareText className="mr-2 h-4 w-4" />
+              Cancelar e avisar pelo WhatsApp
             </Button>
           </DialogFooter>
         </DialogContent>
