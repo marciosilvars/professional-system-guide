@@ -61,6 +61,7 @@ function MotoristasPage() {
   const [form, setForm] = useState({ ...VAZIO });
   const [busca, setBusca] = useState("");
   const [editando, setEditando] = useState<Motorista | null>(null);
+  const [selecionados, setSelecionados] = useState<string[]>([]);
 
   const { data: motoristas = [], isLoading } = useQuery({
     queryKey: ["motoristas"],
@@ -173,8 +174,30 @@ function MotoristasPage() {
       entidadeId: m.id,
       detalhes: m.nome,
     });
+    setSelecionados(selecionados.filter((id) => id !== m.id));
     await recarregar();
     toast.success("Motorista excluído.");
+  };
+
+  const excluirSelecionados = async () => {
+    if (!selecionados.length) return;
+    if (!confirm(`Deseja excluir ${selecionados.length} motoristas selecionados?`)) return;
+    
+    const { error } = await supabase.from("motoristas").delete().in("id", selecionados);
+    if (error) {
+      toast.error("Apenas administradores podem excluir motoristas.");
+      return;
+    }
+    
+    await registrarAuditoria({
+      acao: "excluiu motoristas em lote",
+      entidade: "motorista",
+      detalhes: `${selecionados.length} motoristas`,
+    });
+    
+    setSelecionados([]);
+    await recarregar();
+    toast.success(`${selecionados.length} motoristas excluídos.`);
   };
 
   const exportarBackup = async () => {
@@ -236,7 +259,7 @@ function MotoristasPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header>
-        <h1 className="text-2xl font-bold">Motoristas</h1>
+        <h1 className="text-2xl font-bold">Motoristas Cadastrados</h1>
         <p className="text-sm text-muted-foreground">
           Base usada pelo rodízio automático. Prioritários ficam fora do sorteio e entram por
           atribuição manual.
@@ -318,9 +341,16 @@ function MotoristasPage() {
 
       <section className="surface-panel p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">
-            Cadastrados <span className="text-muted-foreground">({motoristas.length})</span>
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold">
+              Lista <span className="text-muted-foreground">({motoristas.length})</span>
+            </h2>
+            {isAdmin && selecionados.length > 0 && (
+              <Button variant="destructive" size="sm" onClick={excluirSelecionados}>
+                <Trash2 className="mr-2 h-4 w-4" /> Excluir ({selecionados.length})
+              </Button>
+            )}
+          </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -337,11 +367,23 @@ function MotoristasPage() {
         ) : lista.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nenhum motorista encontrado.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky top-0 bg-background/95 backdrop-blur z-10">
                 <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="py-2 pr-3">Nome</th>
+                  {isAdmin && (
+                    <th className="py-2 pl-3 pr-2 w-8">
+                      <input
+                        type="checkbox"
+                        checked={selecionados.length === lista.length && lista.length > 0}
+                        onChange={(e) =>
+                          setSelecionados(e.target.checked ? lista.map((m) => m.id) : [])
+                        }
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                    </th>
+                  )}
+                  <th className="py-2 px-3">Nome</th>
                   <th className="py-2 pr-3">Telefone</th>
                   <th className="py-2 pr-3">Veículo</th>
                   <th className="py-2 pr-3">Situação</th>
@@ -350,8 +392,21 @@ function MotoristasPage() {
               </thead>
               <tbody>
                 {lista.map((m) => (
-                  <tr key={m.id} className="border-b border-border/60">
-                    <td className="py-2.5 pr-3 font-medium">
+                  <tr key={m.id} className="border-b border-border/60 hover:bg-muted/30">
+                    {isAdmin && (
+                      <td className="py-2.5 pl-3 pr-2">
+                        <input
+                          type="checkbox"
+                          checked={selecionados.includes(m.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelecionados([...selecionados, m.id]);
+                            else setSelecionados(selecionados.filter((id) => id !== m.id));
+                          }}
+                          className="h-4 w-4 rounded border-gray-300"
+                        />
+                      </td>
+                    )}
+                    <td className="py-2.5 px-3 font-medium">
                       <span className="flex items-center gap-1.5">
                         {m.prioritario && <Star className="h-3.5 w-3.5 text-warning" />}
                         {m.nome}
