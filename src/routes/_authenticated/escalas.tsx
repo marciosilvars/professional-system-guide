@@ -251,6 +251,7 @@ function EscalasPage() {
       const payloadComHorario = itens.map((i, idx) => ({
         motorista_id: i.motorista_id,
         motorista_nome: i.motorista_nome,
+        nome_snapshot: i.motorista_nome ?? "",
         telefone: i.telefone ?? "",
         dsp: i.dsp || DSP_PADRAO,
         veiculo: i.veiculo,
@@ -270,6 +271,7 @@ function EscalasPage() {
         const payloadSemHorario = itens.map((i, idx) => ({
           motorista_id: i.motorista_id,
           motorista_nome: i.motorista_nome,
+          nome_snapshot: i.motorista_nome ?? "",
           telefone: i.telefone ?? "",
           dsp: i.dsp || DSP_PADRAO,
           veiculo: i.veiculo,
