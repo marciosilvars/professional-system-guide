@@ -343,7 +343,7 @@ function MotoristasPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-semibold">
-              Lista <span className="text-muted-foreground">({motoristas.length})</span>
+              Lista de Motoristas <span className="text-muted-foreground">({motoristas.length})</span>
             </h2>
             {isAdmin && selecionados.length > 0 && (
               <Button variant="destructive" size="sm" onClick={excluirSelecionados}>
