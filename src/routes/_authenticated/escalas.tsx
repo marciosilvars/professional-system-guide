@@ -182,6 +182,15 @@ function EscalasPage() {
       return;
     }
 
+    let itensParaSalvar = [...itens];
+    // Ao confirmar definitiva, muda os "escalado" para "confirmado" automaticamente
+    if (status === "definitiva") {
+      itensParaSalvar = itensParaSalvar.map((i) =>
+        i.status === "escalado" ? { ...i, status: "confirmado" as StatusItem } : i
+      );
+      setItens(itensParaSalvar); // Atualiza na tela também
+    }
+
     // Validação: todos os horários devem estar preenchidos
     const itensSemHorario = itens.filter(
       (i) => i.status !== "cancelado" && (!i.horario || !i.horario.trim())
@@ -248,7 +257,7 @@ function EscalasPage() {
       await supabase.from("escala_itens").delete().eq("escala_id", escalaSalva.id);
 
       // Tenta primeiro com a coluna horario
-      const payloadComHorario = itens.map((i, idx) => ({
+      const payloadComHorario = itensParaSalvar.map((i, idx) => ({
         motorista_id: i.motorista_id,
         motorista_nome: i.motorista_nome,
         nome_snapshot: i.motorista_nome ?? "",
@@ -268,7 +277,7 @@ function EscalasPage() {
 
       // Fallback: se banco ainda não tem coluna horario, envia sem ela
       if (erroItens && (erroItens.message?.includes("horario") || erroItens.message?.includes("column"))) {
-        const payloadSemHorario = itens.map((i, idx) => ({
+        const payloadSemHorario = itensParaSalvar.map((i, idx) => ({
           motorista_id: i.motorista_id,
           motorista_nome: i.motorista_nome,
           nome_snapshot: i.motorista_nome ?? "",
@@ -629,24 +638,76 @@ function EscalasPage() {
                       />
                     </td>
 
-                    {/* Situação — selectável */}
+                    {/* Situação */}
                     <td className="py-2 pr-3">
-                      <Select
-                        value={item.status}
-                        onValueChange={(v) => atualizarItem(idx, { status: v as StatusItem })}
-                        disabled={definitiva}
-                      >
-                        <SelectTrigger className="h-8 w-36">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="escalado">Escalado</SelectItem>
-                          <SelectItem value="confirmado">Confirmado</SelectItem>
-                          <SelectItem value="concluido">Concluído</SelectItem>
-                          <SelectItem value="cancelado">Cancelado</SelectItem>
-                          <SelectItem value="falta">Falta</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      {!definitiva ? (
+                        <div className="flex h-8 w-36 items-center rounded-md border border-border bg-muted px-3 text-sm capitalize font-medium text-muted-foreground">
+                          {item.status}
+                        </div>
+                      ) : (
+                        <Select
+                          value={item.status}
+                          onValueChange={(v) => {
+                            const novoStatus = v as StatusItem;
+                            if (novoStatus === "falta") {
+                              // Registra a falta
+                              const novosItens = [...itens];
+                              novosItens[idx] = { ...novosItens[idx], status: "falta" };
+                              
+                              // Busca substituto do mesmo tipo de veículo
+                              const jaEscalados = new Set(novosItens.map((i) => i.motorista_id).filter(Boolean));
+                              const validos = motoristas.filter(
+                                (m) => m.ativo && !m.prioritario && m.tipo_veiculo === item.veiculo && !indisponiveis.has(m.id) && !jaEscalados.has(m.id)
+                              );
+                              
+                              validos.sort((a, b) => {
+                                const da = a.ultima_escala ?? "";
+                                const db = b.ultima_escala ?? "";
+                                if (da !== db) return da.localeCompare(db);
+                                return a.nome.localeCompare(b.nome, "pt-BR");
+                              });
+                              
+                              const substituto = validos[0];
+                              if (substituto) {
+                                const novo: NovoItem = {
+                                  motorista_id: substituto.id,
+                                  motorista_nome: substituto.nome,
+                                  telefone: substituto.telefone,
+                                  dsp: item.dsp,
+                                  veiculo: substituto.tipo_veiculo,
+                                  onda: item.onda,
+                                  horario: item.horario,
+                                  ordem: 0,
+                                  status: "confirmado", // Substituto entra como confirmado
+                                  prioritario: substituto.prioritario
+                                };
+                                // Insere logo abaixo
+                                novosItens.splice(idx + 1, 0, novo);
+                                // Recalcula ordem
+                                novosItens.forEach((it, i) => (it.ordem = i));
+                                setItens(novosItens);
+                                toast.success(`Falta registrada. Substituto adicionado: ${substituto.nome}`);
+                              } else {
+                                setItens(novosItens);
+                                toast.warning(`Falta registrada, mas NÃO há substitutos disponíveis para ${item.veiculo}.`);
+                              }
+                            } else {
+                              atualizarItem(idx, { status: novoStatus });
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-8 w-36">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="escalado">Escalado</SelectItem>
+                            <SelectItem value="confirmado">Confirmado</SelectItem>
+                            <SelectItem value="concluido">Concluído</SelectItem>
+                            <SelectItem value="cancelado">Cancelado</SelectItem>
+                            <SelectItem value="falta">Falta</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
                     </td>
 
                     {/* Ações — botão cancelar rota */}
