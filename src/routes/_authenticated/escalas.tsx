@@ -182,49 +182,85 @@ function EscalasPage() {
     setSalvando(true);
     try {
       const { data: userData } = await supabase.auth.getUser();
-      const payload = {
-        data,
-        vagas_utilitario: vagas.utilitario,
-        vagas_van: vagas.van,
-        vagas_passeio: vagas.passeio,
-        status,
-        indisponiveis: Array.from(indisponiveis),
-        created_by: userData.user?.id ?? null,
-      };
 
-      const { data: escalaSalva, error } = await supabase
+      // --- 1. Resolve a escala: busca existente ou cria nova ---
+      let escalaSalva: { id: string } | null = null;
+
+      // Tenta buscar escala existente para esta data
+      const { data: escalaExistente, error: erroBusca } = await supabase
         .from("escalas")
-        .upsert(payload, { onConflict: "data" })
-        .select()
-        .single();
-      if (error) throw error;
+        .select("id")
+        .eq("data", data)
+        .maybeSingle();
+      if (erroBusca) throw erroBusca;
 
+      if (escalaExistente) {
+        // Atualiza escala existente
+        const { data: atualizada, error: erroUpdate } = await supabase
+          .from("escalas")
+          .update({
+            vagas_utilitario: vagas.utilitario,
+            vagas_van: vagas.van,
+            vagas_passeio: vagas.passeio,
+            status,
+            indisponiveis: Array.from(indisponiveis),
+          })
+          .eq("id", escalaExistente.id)
+          .select("id")
+          .single();
+        if (erroUpdate) throw erroUpdate;
+        escalaSalva = atualizada;
+      } else {
+        // Cria nova escala
+        const { data: criada, error: erroInsert } = await supabase
+          .from("escalas")
+          .insert({
+            data,
+            vagas_utilitario: vagas.utilitario,
+            vagas_van: vagas.van,
+            vagas_passeio: vagas.passeio,
+            status,
+            indisponiveis: Array.from(indisponiveis),
+            created_by: userData.user?.id ?? null,
+          })
+          .select("id")
+          .single();
+        if (erroInsert) throw erroInsert;
+        escalaSalva = criada;
+      }
+
+      if (!escalaSalva) throw new Error("Não foi possível obter o ID da escala.");
+
+      // --- 2. Apaga itens antigos e insere os novos ---
       await supabase.from("escala_itens").delete().eq("escala_id", escalaSalva.id);
-      
+
+      // Tenta primeiro com a coluna horario
       const payloadComHorario = itens.map((i, idx) => ({
         motorista_id: i.motorista_id,
         motorista_nome: i.motorista_nome,
-        telefone: i.telefone,
+        telefone: i.telefone ?? "",
         dsp: i.dsp || DSP_PADRAO,
         veiculo: i.veiculo,
-        onda: i.onda,
-        horario: i.horario,
+        onda: i.onda ?? "",
+        horario: i.horario ?? "",
         ordem: idx,
         status: i.status,
         escala_id: escalaSalva.id,
       }));
 
-      let { error: erroItens } = await supabase.from("escala_itens").insert(payloadComHorario as any);
-      
-      // Fallback gracioso: caso a coluna horario ainda não tenha sido sincronizada no banco remoto
+      let { error: erroItens } = await supabase
+        .from("escala_itens")
+        .insert(payloadComHorario as any);
+
+      // Fallback: se banco ainda não tem coluna horario, envia sem ela
       if (erroItens && (erroItens.message?.includes("horario") || erroItens.message?.includes("column"))) {
         const payloadSemHorario = itens.map((i, idx) => ({
           motorista_id: i.motorista_id,
           motorista_nome: i.motorista_nome,
-          telefone: i.telefone,
+          telefone: i.telefone ?? "",
           dsp: i.dsp || DSP_PADRAO,
           veiculo: i.veiculo,
-          onda: i.onda || i.horario || "",
+          onda: i.horario || i.onda || "",
           ordem: idx,
           status: i.status,
           escala_id: escalaSalva.id,
@@ -234,6 +270,7 @@ function EscalasPage() {
       }
       if (erroItens) throw erroItens;
 
+      // --- 3. Atualiza ultima_escala dos motoristas (apenas na definitiva) ---
       if (status === "definitiva") {
         const ids = itens.map((i) => i.motorista_id).filter(Boolean) as string[];
         if (ids.length > 0) {
@@ -241,6 +278,7 @@ function EscalasPage() {
         }
       }
 
+      // --- 4. Registra auditoria ---
       await registrarAuditoria({
         acao: status === "definitiva" ? "confirmou escala definitiva" : "salvou prévia da escala",
         entidade: "escala",
@@ -252,7 +290,10 @@ function EscalasPage() {
       await queryClient.invalidateQueries({ queryKey: ["motoristas"] });
       toast.success(status === "definitiva" ? "Escala confirmada!" : "Prévia salva.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Não foi possível salvar a escala.");
+      // Mostra a mensagem real do erro para facilitar diagnóstico
+      const msg = e instanceof Error ? e.message : JSON.stringify(e);
+      toast.error(`Erro ao salvar: ${msg}`);
+      console.error("[persistir] erro:", e);
     } finally {
       setSalvando(false);
     }
@@ -419,9 +460,12 @@ function EscalasPage() {
     });
   };
 
-  const listaFiltrada = motoristas.filter((m) =>
-    m.nome.toLowerCase().includes(busca.trim().toLowerCase()),
-  );
+  const listaFiltrada = motoristas.filter((m) => {
+    if (!busca.trim()) return true; // sem busca, mostra todos
+    const nomeNormalizado = (m.nome || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const buscaNormalizada = busca.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    return nomeNormalizado.includes(buscaNormalizada);
+  });
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -515,6 +559,7 @@ function EscalasPage() {
                   <th className="py-2 pr-3">Veículo</th>
                   <th className="py-2 pr-3">Horário/ ONDA</th>
                   <th className="py-2 pr-3">Situação</th>
+                  <th className="py-2 pr-3 text-center">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -523,7 +568,7 @@ function EscalasPage() {
                     key={idx}
                     className={
                       item.status === "cancelado" || item.status === "falta"
-                        ? "border-b border-border/60 text-muted-foreground line-through"
+                        ? "border-b border-border/60 text-muted-foreground line-through opacity-60"
                         : "border-b border-border/60"
                     }
                   >
@@ -533,33 +578,23 @@ function EscalasPage() {
                         {DSP_PADRAO}
                       </div>
                     </td>
-                    <td className="py-2 pr-3 min-w-52">
-                      <div className="flex items-center gap-1">
-                        <Select
-                          value={item.motorista_id ?? "vago"}
-                          onValueChange={(v) => trocarMotorista(idx, v)}
-                          disabled={definitiva}
-                        >
-                          <SelectTrigger className="h-8">
-                            <SelectValue placeholder="Selecionar motorista" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="vago">Vaga livre</SelectItem>
-                            {motoristas.map((m) => (
-                              <SelectItem key={m.id} value={m.id}>
-                                {m.nome}{m.prioritario ? " ⭐" : ""}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+
+                    {/* Motorista — fixo, apenas leitura */}
+                    <td className="py-2 pr-3 min-w-48">
+                      <div className="flex items-center gap-1.5">
+                        {item.prioritario && <Star className="h-3.5 w-3.5 shrink-0 text-amber-400" />}
+                        <span className="font-medium">{item.motorista_nome}</span>
                       </div>
                     </td>
+
                     {/* Veículo — somente leitura */}
                     <td className="py-2 pr-3">
                       <div className="flex h-8 w-32 items-center rounded-md border border-border bg-muted px-2 text-sm">
                         {item.veiculo || "—"}
                       </div>
                     </td>
+
+                    {/* Horário — editável */}
                     <td className="py-2 pr-3">
                       <Input
                         id={`horario-${idx}`}
@@ -567,7 +602,6 @@ function EscalasPage() {
                         placeholder="hh:mm"
                         value={item.horario ?? ""}
                         onChange={(e) => {
-                          // Permite digitação contínua e aplica formatação automática hh:mm
                           let v = e.target.value.replace(/[^\d:]/g, "").slice(0, 5);
                           if (!v.includes(":") && v.length >= 3) {
                             v = v.slice(0, 2) + ":" + v.slice(2, 4);
@@ -579,6 +613,8 @@ function EscalasPage() {
                         disabled={definitiva}
                       />
                     </td>
+
+                    {/* Situação — selectável */}
                     <td className="py-2 pr-3">
                       <Select
                         value={item.status}
@@ -596,6 +632,30 @@ function EscalasPage() {
                           <SelectItem value="falta">Falta</SelectItem>
                         </SelectContent>
                       </Select>
+                    </td>
+
+                    {/* Ações — botão cancelar rota */}
+                    <td className="py-2 pr-1 text-center">
+                      {!definitiva && item.status !== "cancelado" && (
+                        <button
+                          type="button"
+                          title="Cancelar rota"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => atualizarItem(idx, { status: "cancelado" })}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                      {!definitiva && item.status === "cancelado" && (
+                        <button
+                          type="button"
+                          title="Reativar rota"
+                          className="inline-flex h-8 w-auto items-center justify-center rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          onClick={() => atualizarItem(idx, { status: "escalado" })}
+                        >
+                          Reativar
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -722,10 +782,31 @@ function EscalasPage() {
       </Dialog>
 
       <section className="surface-panel p-6">
-        <h2 className="mb-4 text-lg font-semibold">3. Motoristas indisponíveis</h2>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Marque os motoristas que não devem ser incluídos no rodízio automático de hoje.
-        </p>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">
+              3. Motoristas indisponíveis
+              {indisponiveis.size > 0 && (
+                <span className="ml-2 rounded-full bg-destructive px-2 py-0.5 text-xs font-bold text-destructive-foreground">
+                  {indisponiveis.size} marcado{indisponiveis.size > 1 ? "s" : ""}
+                </span>
+              )}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Marque os motoristas que não devem entrar no rodízio automático de hoje.
+              Total: {motoristas.length} motoristas cadastrados.
+            </p>
+          </div>
+          {indisponiveis.size > 0 && !definitiva && (
+            <button
+              type="button"
+              className="text-xs text-muted-foreground underline hover:text-foreground"
+              onClick={() => setIndisponiveis(new Set())}
+            >
+              Limpar seleção
+            </button>
+          )}
+        </div>
         {motoristasQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Carregando motoristas...</p>
         ) : motoristas.length === 0 ? (
@@ -735,30 +816,46 @@ function EscalasPage() {
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                className="w-64 pl-9"
-                placeholder="Buscar motorista..."
+                className="w-full max-w-xs pl-9"
+                placeholder={`Buscar entre ${motoristas.length} motoristas...`}
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
               />
             </div>
-            <div className="max-h-72 overflow-y-auto rounded-md border border-border p-3">
+            <div className="max-h-[400px] overflow-y-auto rounded-md border border-border p-4">
               <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 {listaFiltrada.map((m) => (
-                  <div key={m.id} className="flex items-center gap-2">
+                  <div
+                    key={m.id}
+                    className={`flex items-center gap-2 rounded-md px-2 py-1 ${
+                      indisponiveis.has(m.id) ? "bg-destructive/10" : ""
+                    }`}
+                  >
                     <Checkbox
                       id={`indisponivel-${m.id}`}
                       checked={indisponiveis.has(m.id)}
                       onCheckedChange={() => alternarIndisponivel(m.id)}
                       disabled={definitiva}
                     />
-                    <Label htmlFor={`indisponivel-${m.id}`} className="font-normal">
+                    <Label htmlFor={`indisponivel-${m.id}`} className="cursor-pointer font-normal leading-tight">
                       {m.nome}
+                      {!m.ativo && <span className="ml-1 text-xs text-muted-foreground">(inativo)</span>}
                       {m.prioritario && <span className="ml-1 text-amber-400">⭐</span>}
                     </Label>
                   </div>
                 ))}
               </div>
+              {listaFiltrada.length === 0 && busca && (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  Nenhum motorista encontrado para "{busca}".
+                </p>
+              )}
             </div>
+            {listaFiltrada.length > 0 && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Exibindo {listaFiltrada.length} de {motoristas.length} motoristas.
+              </p>
+            )}
           </>
         )}
       </section>
